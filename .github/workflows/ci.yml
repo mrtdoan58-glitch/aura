@@ -14,7 +14,7 @@ jobs:
     name: Lint · Types · Unit/Integration/DB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -32,7 +32,7 @@ jobs:
     name: Production Build + Bundle Analyze
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -68,7 +68,7 @@ jobs:
       DATABASE_URL: postgresql://aura:aura@localhost:5432/aura
       AUTH_DRIVER: memory
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -90,7 +90,7 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # gitleaks diffs against the PR's parent commit; the default shallow
           # clone (depth 1) doesn't have that object, so `git log <sha>^..<sha>`
