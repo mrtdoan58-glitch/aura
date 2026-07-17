@@ -3,7 +3,10 @@ FROM node:26-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package.json package-lock.json ./
-RUN npm ci
+# --ignore-scripts: bu aşamada yalnızca package.json/lock kopyalanır (katman
+# cache'i için), prisma/schema.prisma henüz yok — postinstall'ın `prisma
+# generate`'i burada patlar. Builder aşaması zaten kendi generate'ini çalıştırır.
+RUN npm ci --ignore-scripts
 
 # ---------- build ----------
 FROM node:26-alpine AS builder

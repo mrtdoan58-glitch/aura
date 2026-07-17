@@ -3,7 +3,8 @@ FROM node:26-alpine
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package.json package-lock.json ./
-RUN npm ci
+# --ignore-scripts: prisma/schema.prisma henüz kopyalanmadı, postinstall patlar
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npx prisma generate || true
 ENV NEXT_TELEMETRY_DISABLED=1
