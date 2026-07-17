@@ -14,7 +14,7 @@
   --surface-2: #f1f5f9;
   --text: #111827;
   --text-2: #6b7280;
-  --text-3: #9ca3af;
+  --text-3: #6e7581; /* WCAG AA (4.5:1) için #9ca3af'tan koyulaştırıldı */
   --border: #e5e7eb;
   --glass: rgba(255, 255, 255, 0.72);
   --ring: rgba(37, 99, 235, 0.16);
@@ -29,7 +29,7 @@
   --surface-2: #1b2333;
   --text: #f3f4f6;
   --text-2: #9aa4b2;
-  --text-3: #6b7480;
+  --text-3: #757e8a; /* WCAG AA (4.5:1) için #6b7480'den açıldı */
   --border: #232c3d;
   --glass: rgba(18, 24, 38, 0.72);
   --ring: rgba(59, 130, 246, 0.3);

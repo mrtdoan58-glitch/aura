@@ -16,18 +16,18 @@ export function AppBar() {
       </Link>
       <div className="flex items-center gap-1">
         <ThemeToggle />
-        <Link href="/explore">
-          <IconButton>
+        <Link href="/explore" aria-label="Keşfet">
+          <IconButton aria-label="Keşfet">
             <Search className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </IconButton>
         </Link>
-        <Link href="/notifications">
-          <IconButton badge>
+        <Link href="/notifications" aria-label="Bildirimler">
+          <IconButton badge aria-label="Bildirimler">
             <Heart className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </IconButton>
         </Link>
-        <Link href="/messages">
-          <IconButton badge>
+        <Link href="/messages" aria-label="Mesajlar">
+          <IconButton badge aria-label="Mesajlar">
             <Send className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </IconButton>
         </Link>

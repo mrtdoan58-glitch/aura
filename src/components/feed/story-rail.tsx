@@ -43,7 +43,8 @@ export function StoryRail({ onOpen }: { onOpen: (stories: StoryDTO[], index: num
       {stories.map((s, i) => (
         <button key={s.id} onClick={() => onOpen(stories, i)} className="flex w-[66px] shrink-0 flex-col items-center gap-1.5">
           <div className={cn("h-[66px] w-[66px] rounded-full p-[2.5px] transition-transform active:scale-95", s.seenByMe ? "bg-border" : "story-ring")}>
-            <Image src={s.author.avatarUrl} alt={s.author.username} width={66} height={66} className="h-full w-full rounded-full border-[2.5px] border-bg object-cover" />
+            {/* alt="" — kullanıcı adı hemen altındaki <span> ile zaten görünür, tekrar yersiz */}
+            <Image src={s.author.avatarUrl} alt="" width={66} height={66} className="h-full w-full rounded-full border-[2.5px] border-bg object-cover" />
           </div>
           <span className="max-w-[64px] truncate text-[11.5px] font-medium text-fg-2">{s.author.username}</span>
         </button>
