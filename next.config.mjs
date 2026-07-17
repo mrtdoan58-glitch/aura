@@ -1,3 +1,11 @@
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+// Üst dizinlerde ilgisiz bir package-lock.json bulunursa Next.js workspace root'u
+// yanlış algılayıp standalone çıktısını (server.js) beklenmedik bir yere iç içe koyabilir.
+// Root'u projenin kendi dizinine sabitliyoruz.
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   {
@@ -21,6 +29,7 @@ const securityHeaders = [
 const baseConfig = {
   reactStrictMode: true,
   output: "standalone",
+  outputFileTracingRoot: projectRoot,
   experimental: { cpus: 1, workerThreads: false },
   images: {
     formats: ["image/avif", "image/webp"],

@@ -22,7 +22,10 @@ export default defineConfig({
     { name: "tablet", use: { ...devices["iPad Mini"] } },
   ],
   webServer: {
-    command: "npm run start",
+    // "next start", next.config.mjs'deki `output: "standalone"` (Docker build modu) ile
+    // uyumlu değildir; üretimdekiyle aynı sunucu şeklini kullanmak için standalone
+    // server.js'i başlatıyoruz (bkz. scripts/start-standalone.mjs).
+    command: "npm run start:standalone",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { registerAndLogin } from "./helpers";
 
 test.describe("Feed & Post", () => {
   test("feed loads posts", async ({ page }) => {
@@ -10,12 +11,17 @@ test.describe("Feed & Post", () => {
     await page.goto("/");
     await page.locator("article").first().waitFor();
     const initial = await page.locator("article").count();
-    for (let i = 0; i < 4; i++) {
-      await page.mouse.wheel(0, 4000);
-      await page.waitForTimeout(500);
-    }
-    const after = await page.locator("article").count();
-    expect(after).toBeGreaterThan(initial);
+    // page.mouse.wheel() mobil WebKit'te desteklenmiyor; window.scrollTo tüm
+    // motorlarda çalışır ve IntersectionObserver girişte fark etmeksizin tetiklenir.
+    await expect
+      .poll(
+        async () => {
+          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+          return page.locator("article").count();
+        },
+        { timeout: 10_000 }
+      )
+      .toBeGreaterThan(initial);
   });
 
   test("like toggles optimistically", async ({ page }) => {
@@ -36,15 +42,21 @@ test.describe("Feed & Post", () => {
   });
 
   test("opens comments sheet and adds a comment", async ({ page }) => {
+    // Yorum eklemek kimlik doğrulama gerektirir (server action UNAUTHENTICATED döner).
+    await registerAndLogin(page);
     await page.goto("/");
     const first = page.locator("article").first();
     await first.waitFor();
     await first.getByRole("button", { name: /Yorum yap/i }).click();
     const dialog = page.getByRole("dialog", { name: /Yorumlar/i });
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel(/Yorum metni/i).fill("Harika bir kompozisyon");
+    // Metin her çalıştırmada benzersiz: AUTH_DRIVER=memory store'u tüm test koşusu
+    // (ve retry'ler) boyunca paylaşıldığından, sabit bir metin önceki eklenen
+    // yorumlarla çakışıp strict-mode ihlaline yol açabilir.
+    const commentText = `Harika bir kompozisyon ${Date.now()}`;
+    await dialog.getByLabel(/Yorum metni/i).fill(commentText);
     await dialog.getByRole("button", { name: /Gönder/i }).click();
-    await expect(dialog.getByText("Harika bir kompozisyon")).toBeVisible();
+    await expect(dialog.getByText(commentText)).toBeVisible();
   });
 
   test("opens story viewer", async ({ page }) => {

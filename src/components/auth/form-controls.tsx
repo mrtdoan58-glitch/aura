@@ -39,7 +39,7 @@ export const TextField = forwardRef<HTMLInputElement, FieldProps>(({ label, erro
 TextField.displayName = "TextField";
 
 export const PasswordField = forwardRef<HTMLInputElement, FieldProps & { showStrength?: boolean; value?: string }>(
-  ({ label, error, id, showStrength, value = "", className, ...props }, ref) => {
+  ({ label, error, id, showStrength, value, className, ...props }, ref) => {
     const [visible, setVisible] = useState(false);
     const inputId = id ?? props.name;
     return (
@@ -58,6 +58,10 @@ export const PasswordField = forwardRef<HTMLInputElement, FieldProps & { showStr
               error ? "border-danger focus:ring-danger/15" : "border-border focus:border-primary focus:ring-[var(--ring)]",
               className
             )}
+            // `value` yalnızca çağıran taraf açıkça geçtiğinde (ör. güç göstergesi
+            // için) controlled olur; aksi halde react-hook-form'un ref tabanlı
+            // uncontrolled kullanımına bırakılır. Sabit bir varsayılan (`= ""`)
+            // input'u her zaman controlled yapıp kullanıcı girişini geri alıyordu.
             value={value}
             {...props}
           />
@@ -70,7 +74,7 @@ export const PasswordField = forwardRef<HTMLInputElement, FieldProps & { showStr
             {visible ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
           </button>
         </div>
-        {showStrength && value.length > 0 && <PasswordStrength value={value} />}
+        {showStrength && (value ?? "").length > 0 && <PasswordStrength value={value ?? ""} />}
         {error && (
           <p className="mt-1.5 text-[12.5px] font-medium text-danger" role="alert">
             {error}

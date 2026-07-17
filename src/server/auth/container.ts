@@ -14,8 +14,16 @@ import {
   InMemoryTokenRepository, InMemoryLoginAttemptRepository,
 } from "@/server/auth/repositories/in-memory";
 
-let injectedDeps: AuthDeps | null = null;
-let cached: AuthService | null = null;
+// Next.js, Server Action'ları ve Server Component render'larını üretim build'inde
+// ayrı chunk'lara koyabilir; bu chunk'lar aynı kaynak dosyayı ayrı modül örnekleri
+// olarak yükleyebilir. Sıradan bir modül-seviyesi değişken bu durumda gerçek bir
+// singleton olmaz (ör. login'de oluşturulan in-memory oturum, sayfa render'ında
+// görünmez olur). `globalThis` süreç genelinde tek olduğundan gerçek bir singleton
+// garanti eder (bkz. server/db/prisma.ts'teki aynı desen).
+const globalForAuthContainer = globalThis as unknown as {
+  __auraAuthInjectedDeps?: AuthDeps | null;
+  __auraAuthCached?: AuthService | null;
+};
 
 /** Test/dev bağımlılıkları — DB'siz. Testler bunu doğrudan kullanır. */
 export function buildInMemoryDeps(now?: () => Date): AuthDeps {
@@ -34,12 +42,16 @@ export function buildInMemoryDeps(now?: () => Date): AuthDeps {
 
 /** Üretim composition-root'u tarafından çağrılır (ör. Prisma + Redis + Resend bağımlılıkları). */
 export function configureAuthDeps(deps: AuthDeps): void {
-  injectedDeps = deps;
-  cached = null;
+  globalForAuthContainer.__auraAuthInjectedDeps = deps;
+  globalForAuthContainer.__auraAuthCached = null;
 }
 
 /** Uygulama genelinde tek AuthService örneği. */
 export function getAuthService(): AuthService {
-  if (!cached) cached = new AuthService(injectedDeps ?? buildInMemoryDeps());
-  return cached;
+  if (!globalForAuthContainer.__auraAuthCached) {
+    globalForAuthContainer.__auraAuthCached = new AuthService(
+      globalForAuthContainer.__auraAuthInjectedDeps ?? buildInMemoryDeps()
+    );
+  }
+  return globalForAuthContainer.__auraAuthCached;
 }

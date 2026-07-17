@@ -9,8 +9,14 @@ import {
 } from "@/server/feed/repositories/in-memory";
 import { InMemoryRateLimiter } from "@/server/rate-limit/rate-limiter";
 
-let injectedDeps: FeedDeps | null = null;
-let cached: FeedService | null = null;
+// bkz. server/auth/container.ts — Next.js Server Action ve Server Component chunk'ları
+// bu dosyanın ayrı modül örneklerini yükleyebilir; gerçek bir singleton için
+// globalThis kullanılır (aksi halde ör. bir Server Action ile eklenen yorum,
+// bir Route Handler'ın gördüğü feed store'da hiç var olmaz).
+const globalForFeedContainer = globalThis as unknown as {
+  __auraFeedInjectedDeps?: FeedDeps | null;
+  __auraFeedCached?: FeedService | null;
+};
 
 export function buildInMemoryFeedDeps(): FeedDeps {
   const posts = new InMemoryPostRepository();
@@ -25,11 +31,15 @@ export function buildInMemoryFeedDeps(): FeedDeps {
 }
 
 export function configureFeedDeps(deps: FeedDeps): void {
-  injectedDeps = deps;
-  cached = null;
+  globalForFeedContainer.__auraFeedInjectedDeps = deps;
+  globalForFeedContainer.__auraFeedCached = null;
 }
 
 export function getFeedService(): FeedService {
-  if (!cached) cached = new FeedService(injectedDeps ?? buildInMemoryFeedDeps());
-  return cached;
+  if (!globalForFeedContainer.__auraFeedCached) {
+    globalForFeedContainer.__auraFeedCached = new FeedService(
+      globalForFeedContainer.__auraFeedInjectedDeps ?? buildInMemoryFeedDeps()
+    );
+  }
+  return globalForFeedContainer.__auraFeedCached;
 }

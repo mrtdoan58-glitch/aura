@@ -36,7 +36,7 @@ test.describe("Authentication", () => {
     // Giriş
     await page.goto("/login");
     await page.getByLabel("E-posta").fill(`${u}@aura.social`);
-    await page.getByLabel("Şifre").fill("Str0ngPass!");
+    await page.getByLabel("Şifre", { exact: true }).fill("Str0ngPass!");
     await page.getByRole("button", { name: /Giriş yap/i }).click();
     await expect(page).toHaveURL("/");
 
@@ -48,7 +48,7 @@ test.describe("Authentication", () => {
   test("shows error on invalid credentials", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("E-posta").fill("ghost@aura.social");
-    await page.getByLabel("Şifre").fill("wrongpass");
+    await page.getByLabel("Şifre", { exact: true }).fill("wrongpass");
     await page.getByRole("button", { name: /Giriş yap/i }).click();
     await expect(page.getByText(/E-posta veya şifre hatalı/i)).toBeVisible();
   });
