@@ -43,6 +43,8 @@
     "src/instrumentation.ts",
     "src/server/auth/prisma-deps.ts",
     "src/server/auth/repositories/prisma.ts",
+    "src/server/feed/prisma-deps.ts",
+    "src/server/feed/repositories/prisma.ts",
     "src/server/db/prisma.ts",
     "tests/e2e/**"
   ]

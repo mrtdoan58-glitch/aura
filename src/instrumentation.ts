@@ -18,6 +18,10 @@ export async function register() {
       const { configureAuthDeps } = await import("@/server/auth/container");
       const { buildPrismaDeps } = await import("@/server/auth/prisma-deps");
       configureAuthDeps(buildPrismaDeps());
+
+      const { configureFeedDeps } = await import("@/server/feed/container");
+      const { buildPrismaFeedDeps } = await import("@/server/feed/prisma-deps");
+      configureFeedDeps(buildPrismaFeedDeps());
     }
   }
 }
