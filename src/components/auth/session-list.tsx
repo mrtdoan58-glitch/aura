@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Monitor, Smartphone, Tablet, LogOut, ShieldCheck } from "lucide-react";
 import type { Session } from "@/server/auth/domain";
 import { revokeSessionAction, revokeOtherSessionsAction } from "@/server/actions/session-actions";
@@ -9,6 +9,21 @@ function deviceIcon(label: string | null) {
   if (label && /iphone|android/i.test(label)) return Smartphone;
   if (label && /ipad|tablet/i.test(label)) return Tablet;
   return Monitor;
+}
+
+/**
+ * `toLocaleDateString` sunucu ile istemcinin ICU/zaman dilimi farkına göre
+ * farklı string üretebilir (ör. Vercel'in serverless Node'unda kısıtlı ICU),
+ * bu da bu Client Component sunucudan gerçek veriyle prerender edildiğinde
+ * hydration hatasına yol açar. Tarihi yalnızca mount sonrası, istemcide
+ * biçimlendiriyoruz — sunucu ve ilk istemci render'ı böylece birebir eşleşir.
+ */
+function LastUsedDate({ date }: { date: Date | string }) {
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => {
+    setText(new Date(date).toLocaleDateString("tr-TR"));
+  }, [date]);
+  return <>{text ?? "…"}</>;
 }
 
 export function SessionList({ sessions, currentId }: { sessions: Session[]; currentId: string | null }) {
@@ -49,7 +64,7 @@ export function SessionList({ sessions, currentId }: { sessions: Session[]; curr
                 </div>
                 <div className="mt-0.5 truncate text-[12.5px] text-fg-3">
                   {s.ipAddress ?? "IP bilinmiyor"} · Son etkinlik{" "}
-                  {new Date(s.lastUsedAt).toLocaleDateString("tr-TR")}
+                  <LastUsedDate date={s.lastUsedAt} />
                 </div>
               </div>
               {!isCurrent && (
