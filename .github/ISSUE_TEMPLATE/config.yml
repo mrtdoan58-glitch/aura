@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Güvenlik açığı
+    url: https://github.com/mrtdoan58-glitch/aura/security/advisories/new
+    about: Güvenlik açıklarını lütfen özel advisory ile bildirin (herkese açık issue değil).
+  - name: Soru / tartışma
+    url: https://github.com/mrtdoan58-glitch/aura/discussions
+    about: Sorular ve fikirler için Discussions kullanın.

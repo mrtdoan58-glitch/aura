@@ -1,0 +1,230 @@
+// Aura — Authentication şeması (Sprint 1)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  name          String
+  passwordHash  String
+  role          Role      @default(USER)
+  emailVerified DateTime?
+  avatarUrl     String?
+  // Brute-force / hesap kilitleme
+  failedLoginCount Int      @default(0)
+  lockedUntil      DateTime?
+  // 2FA
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean  @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions           Session[]
+  emailTokens        EmailVerificationToken[]
+  passwordResets     PasswordResetToken[]
+  posts        Post[]      @relation("UserPosts")
+  comments     Comment[]   @relation("UserComments")
+  likes        Like[]      @relation("UserLikes")
+  saves        SavedPost[] @relation("UserSaves")
+  stories      Story[]     @relation("UserStories")
+  storyViews   StoryView[] @relation("UserStoryViews")
+  following    Follow[]    @relation("Following")
+  followers    Follow[]    @relation("Followers")
+
+  @@index([email])
+  @@index([username])
+}
+
+// Kalıcı, dönen (rotating) oturumlar = cihaz oturumları
+model Session {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Refresh token'ın hash'i saklanır (asla düz metin)
+  refreshTokenHash String @unique
+  // Rotasyon zinciri: yeni oturum bir öncekiyle bağlanır (reuse-detection)
+  previousTokenHash String?
+  // Cihaz meta verisi
+  userAgent      String?
+  ipAddress      String?
+  deviceLabel    String?
+  rememberMe     Boolean  @default(false)
+  expiresAt      DateTime
+  lastUsedAt     DateTime @default(now())
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+}
+
+model EmailVerificationToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Rate limiting / denetim için giriş denemesi kaydı
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  email      String
+  ipAddress  String?
+  success    Boolean
+  createdAt  DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+/* ===================== Sprint 2 — Feed & Post ===================== */
+
+enum MediaType {
+  image
+  video
+}
+
+model Post {
+  id           String   @id @default(cuid())
+  authorId     String
+  author       User     @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  caption      String
+  tags         String[]
+  location     String?
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  editedAt     DateTime?
+  deletedAt    DateTime?
+
+  media    Media[]
+  comments Comment[]
+  likes    Like[]
+  saves    SavedPost[]
+
+  @@index([createdAt, id])
+  @@index([authorId, createdAt])
+}
+
+model Media {
+  id          String    @id @default(cuid())
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  type        MediaType @default(image)
+  url         String
+  posterUrl   String?
+  width       Int
+  height      Int
+  blurDataUrl String?
+  order       Int       @default(0)
+
+  @@index([postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  text      String
+  likeCount Int      @default(0)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@index([postId, createdAt, id])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([postId])
+}
+
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserSaves", fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt])
+}
+
+model Story {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation("UserStories", fields: [authorId], references: [id], onDelete: Cascade)
+  mediaUrl  String
+  type      MediaType @default(image)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  views     StoryView[]
+
+  @@index([expiresAt])
+  @@index([authorId, createdAt])
+}
+
+model StoryView {
+  id       String   @id @default(cuid())
+  storyId  String
+  story    Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewerId String
+  viewer   User     @relation("UserStoryViews", fields: [viewerId], references: [id], onDelete: Cascade)
+  seenAt   DateTime @default(now())
+
+  @@unique([storyId, viewerId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}

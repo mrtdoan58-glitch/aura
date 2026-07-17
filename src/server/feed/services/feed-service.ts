@@ -1,0 +1,136 @@
+/**
+ * FeedService — feed/post/etkileşim iş kuralları.
+ * Bağımlılıklar arayüzle enjekte edilir; Prisma olmadan test edilebilir.
+ * Beğeni/kaydet toggle'ları idempotent (çift tıklama güvenli) ve sayaçları tutarlı tutar.
+ */
+import type {
+  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
+  CursorPage, PostView, Post, Comment, Story, Author,
+} from "@/server/feed/domain";
+import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
+
+export interface FeedDeps {
+  posts: PostRepository;
+  likes: LikeRepository;
+  saves: SaveRepository;
+  comments: CommentRepository;
+  stories: StoryRepository;
+  commentRateLimiter?: RateLimiter;
+  now?: () => Date;
+}
+
+const DEFAULT_LIMIT = 8;
+const MAX_LIMIT = 30;
+const MAX_COMMENT_LEN = 1000;
+
+export class FeedError extends Error {
+  constructor(
+    readonly code: "NOT_FOUND" | "INVALID_INPUT" | "UNAUTHENTICATED" | "RATE_LIMITED",
+    message: string
+  ) {
+    super(message);
+    this.name = "FeedError";
+  }
+}
+
+function clampLimit(n: number | undefined): number {
+  if (!n || Number.isNaN(n)) return DEFAULT_LIMIT;
+  return Math.min(Math.max(Math.trunc(n), 1), MAX_LIMIT);
+}
+
+export class FeedService {
+  private now: () => Date;
+  constructor(private readonly deps: FeedDeps) {
+    this.now = deps.now ?? (() => new Date());
+  }
+
+  /** Zenginleştirme: bir gönderi grubuna kullanıcının like/save durumunu ekler (toplu, N+1 yok). */
+  private async enrich(posts: Post[], viewerId: string | null): Promise<PostView[]> {
+    if (!viewerId) return posts.map((p) => ({ ...p, likedByMe: false, savedByMe: false }));
+    const ids = posts.map((p) => p.id);
+    const [liked, saved] = await Promise.all([
+      this.deps.likes.filterLiked(viewerId, ids),
+      this.deps.saves.filterSaved(viewerId, ids),
+    ]);
+    return posts.map((p) => ({ ...p, likedByMe: liked.has(p.id), savedByMe: saved.has(p.id) }));
+  }
+
+  async getFeed(
+    params: { cursor?: string | null; limit?: number },
+    viewerId: string | null
+  ): Promise<CursorPage<PostView>> {
+    const page = await this.deps.posts.listFeed({ cursor: params.cursor, limit: clampLimit(params.limit) });
+    return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
+  }
+
+  async getPost(id: string, viewerId: string | null): Promise<PostView> {
+    const post = await this.deps.posts.findById(id);
+    if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");
+    const [enriched] = await this.enrich([post], viewerId);
+    return enriched;
+  }
+
+  async getSaved(
+    params: { cursor?: string | null; limit?: number },
+    viewerId: string
+  ): Promise<CursorPage<PostView>> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    const page = await this.deps.saves.listSaved(viewerId, { cursor: params.cursor, limit: clampLimit(params.limit) });
+    return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
+  }
+
+  /* --------------------------- Beğeni --------------------------- */
+  async setLike(postId: string, viewerId: string, liked: boolean): Promise<{ liked: boolean; likeCount: number }> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    const post = await this.deps.posts.findById(postId);
+    if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");
+    if (liked) {
+      const added = await this.deps.likes.add(viewerId, postId);
+      if (added) await this.deps.posts.incrementLikeCount(postId, 1);
+    } else {
+      const removed = await this.deps.likes.remove(viewerId, postId);
+      if (removed) await this.deps.posts.incrementLikeCount(postId, -1);
+    }
+    const fresh = await this.deps.posts.findById(postId);
+    return { liked, likeCount: fresh?.likeCount ?? post.likeCount };
+  }
+
+  /* --------------------------- Kaydet --------------------------- */
+  async setSave(postId: string, viewerId: string, saved: boolean): Promise<{ saved: boolean }> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    const post = await this.deps.posts.findById(postId);
+    if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");
+    if (saved) await this.deps.saves.add(viewerId, postId);
+    else await this.deps.saves.remove(viewerId, postId);
+    return { saved };
+  }
+
+  /* --------------------------- Yorumlar --------------------------- */
+  async listComments(postId: string, params: { cursor?: string | null; limit?: number }): Promise<CursorPage<Comment>> {
+    return this.deps.comments.listByPost(postId, { cursor: params.cursor, limit: clampLimit(params.limit) });
+  }
+
+  async addComment(postId: string, author: Author, text: string): Promise<Comment> {
+    const trimmed = text.trim();
+    if (!trimmed) throw new FeedError("INVALID_INPUT", "Yorum boş olamaz.");
+    if (trimmed.length > MAX_COMMENT_LEN) throw new FeedError("INVALID_INPUT", "Yorum çok uzun.");
+    if (this.deps.commentRateLimiter) {
+      const rl = await this.deps.commentRateLimiter.consume(`comment:${author.id}`);
+      if (!rl.allowed) throw new FeedError("RATE_LIMITED", "Çok hızlı yorum yapıyorsun. Biraz bekle.");
+    }
+    const post = await this.deps.posts.findById(postId);
+    if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");
+    const comment = await this.deps.comments.add({ postId, author, text: trimmed });
+    await this.deps.posts.incrementCommentCount(postId, 1);
+    return comment;
+  }
+
+  /* --------------------------- Hikayeler --------------------------- */
+  async getStories(viewerId: string | null): Promise<Story[]> {
+    return this.deps.stories.listActive(this.now(), viewerId);
+  }
+  async markStorySeen(storyId: string, viewerId: string): Promise<void> {
+    if (!viewerId) return;
+    await this.deps.stories.markSeen(storyId, viewerId);
+  }
+}
