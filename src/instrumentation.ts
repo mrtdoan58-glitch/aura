@@ -7,10 +7,18 @@ import { registerOTel } from "@vercel/otel";
 export async function register() {
   // Ortam değişkenlerini erken doğrula (yanlış konfigürasyon fail-fast).
   const { getEnv } = await import("@/lib/env");
-  getEnv();
+  const env = getEnv();
   registerOTel({ serviceName: "aura" });
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("../sentry.server.config");
+    // AUTH_DRIVER=prisma iken üretim (Prisma) bağımlılıklarını enjekte et;
+    // aksi halde container varsayılan olarak in-memory'e düşer. Prisma client
+    // yalnızca Node.js runtime'da çalıştığından edge'de atlanır.
+    if (env.AUTH_DRIVER === "prisma") {
+      const { configureAuthDeps } = await import("@/server/auth/container");
+      const { buildPrismaDeps } = await import("@/server/auth/prisma-deps");
+      configureAuthDeps(buildPrismaDeps());
+    }
   }
 }
 
