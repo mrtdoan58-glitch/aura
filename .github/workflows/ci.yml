@@ -91,6 +91,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # gitleaks diffs against the PR's parent commit; the default shallow
+          # clone (depth 1) doesn't have that object, so `git log <sha>^..<sha>`
+          # fails with "unknown revision" on pull_request-triggered runs.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
