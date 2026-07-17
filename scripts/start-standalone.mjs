@@ -15,7 +15,8 @@ if (!existsSync(serverEntry)) {
   process.exit(1);
 }
 
-cpSync(path.join(root, "public"), path.join(standaloneDir, "public"), { recursive: true });
+const publicDir = path.join(root, "public");
+if (existsSync(publicDir)) cpSync(publicDir, path.join(standaloneDir, "public"), { recursive: true });
 cpSync(path.join(root, ".next", "static"), path.join(standaloneDir, ".next", "static"), { recursive: true });
 
 const child = spawn(process.execPath, [serverEntry], { stdio: "inherit", env: process.env });
