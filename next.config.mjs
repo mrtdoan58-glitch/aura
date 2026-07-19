@@ -1,10 +1,17 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Üst dizinlerde ilgisiz bir package-lock.json bulunursa Next.js workspace root'u
 // yanlış algılayıp standalone çıktısını (server.js) beklenmedik bir yere iç içe koyabilir.
 // Root'u projenin kendi dizinine sabitliyoruz.
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
+// Sentry client SDK hata olaylarını kendi DSN host'una gönderir; CSP connect-src
+// 'self' bunu engeller. Host'u DSN'den türetiyoruz ki hardcode edilmesin.
+const sentryIngestHost = process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? new URL(process.env.NEXT_PUBLIC_SENTRY_DSN).host
+  : null;
 
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
@@ -16,7 +23,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self'",
+      `connect-src 'self'${sentryIngestHost ? ` https://${sentryIngestHost}` : ""}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -50,4 +57,16 @@ if (process.env.ANALYZE === "true") {
   config = withBundleAnalyzer({ enabled: true, openAnalyzer: false })(baseConfig);
 }
 
-export default config;
+// withSentryConfig, sentry.client.config.ts'i client bundle'a enjekte eder ve
+// build sırasında source map yükler (SENTRY_AUTH_TOKEN yoksa sessizce atlar).
+export default withSentryConfig(config, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  widenClientFileUpload: true,
+  disableLogger: true,
+  automaticVercelMonitors: false,
+  // SENTRY_AUTH_TOKEN henüz ayarlanmadı, yani source map yüklenemez —
+  // üretmek yalnızca minified kaynağı gereksiz yere herkese açık sunar.
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+});
