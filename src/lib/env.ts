@@ -8,6 +8,8 @@ const schema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   RESEND_API_KEY: z.string().optional(),
   RESEND_EMAIL_DOMAIN: z.string().optional(),
+  KV_REST_API_URL: z.string().url().optional(),
+  KV_REST_API_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;
