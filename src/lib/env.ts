@@ -6,6 +6,8 @@ const schema = z.object({
   DATABASE_URL: z.string().url().optional(),
   AUTH_DRIVER: z.enum(["prisma", "memory"]).default("memory"),
   APP_URL: z.string().url().default("http://localhost:3000"),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_EMAIL_DOMAIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

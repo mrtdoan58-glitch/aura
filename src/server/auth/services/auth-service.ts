@@ -78,7 +78,16 @@ export class AuthService {
       tokenHash: hashToken(token),
       expiresAt: new Date(this.now().getTime() + VERIFY_TTL_MS),
     });
-    await this.deps.mailer.sendVerificationEmail(user.email, token);
+    // Token zaten kalıcı; sağlayıcı hatası (rate limit, geçici kesinti) kayıt
+    // akışını düşürmesin — kullanıcı hesabı oluşur, e-posta arka planda başarısız olur.
+    try {
+      await this.deps.mailer.sendVerificationEmail(user.email, token);
+    } catch (err) {
+      this.deps.logger?.log("error", "mailer.sendVerificationEmail failed", {
+        userId: user.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   async verifyEmail(token: string): Promise<void> {
@@ -247,7 +256,14 @@ export class AuthService {
       tokenHash: hashToken(token),
       expiresAt: new Date(this.now().getTime() + RESET_TTL_MS),
     });
-    await this.deps.mailer.sendPasswordResetEmail(user.email, token);
+    try {
+      await this.deps.mailer.sendPasswordResetEmail(user.email, token);
+    } catch (err) {
+      this.deps.logger?.log("error", "mailer.sendPasswordResetEmail failed", {
+        userId: user.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {

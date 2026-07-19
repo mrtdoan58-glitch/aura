@@ -6,12 +6,25 @@
  */
 import type { AuthDeps } from "@/server/auth/services/auth-service";
 import { InMemoryRateLimiter } from "@/server/rate-limit/rate-limiter";
-import { ConsoleMailer } from "@/server/auth/mailer";
+import { ConsoleMailer, type Mailer } from "@/server/auth/mailer";
+import { ResendMailer } from "@/server/auth/resend-mailer";
 import { ConsoleLogger } from "@/server/observability/logger";
+import { getEnv } from "@/lib/env";
 import {
   PrismaUserRepository, PrismaSessionRepository,
   PrismaLoginAttemptRepository, prismaEmailTokenRepository, prismaResetTokenRepository,
 } from "@/server/auth/repositories/prisma";
+
+function buildMailer(): Mailer {
+  const env = getEnv();
+  if (env.RESEND_API_KEY && env.RESEND_EMAIL_DOMAIN) {
+    return new ResendMailer(env.RESEND_API_KEY, env.RESEND_EMAIL_DOMAIN, env.APP_URL);
+  }
+  // RESEND_API_KEY/RESEND_EMAIL_DOMAIN ayarlanmamışsa (henüz kurulmamış
+  // ortamlar) sessizce ConsoleMailer'a düşer — e-posta gönderilmez ama
+  // uygulama çökmez.
+  return new ConsoleMailer();
+}
 
 export function buildPrismaDeps(): AuthDeps {
   return {
@@ -22,8 +35,7 @@ export function buildPrismaDeps(): AuthDeps {
     loginAttempts: new PrismaLoginAttemptRepository(),
     // TODO(prod): Redis sliding-window rate limiter ile değiştir.
     loginRateLimiter: new InMemoryRateLimiter(5, 15 * 60 * 1000),
-    // TODO(prod): Resend/SES mailer ile değiştir.
-    mailer: new ConsoleMailer(),
+    mailer: buildMailer(),
     logger: new ConsoleLogger(),
   };
 }
