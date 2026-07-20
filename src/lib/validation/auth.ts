@@ -19,7 +19,7 @@ export const registerSchema = z
     email: z.string().email("Geçerli bir e-posta gir"),
     password: passwordSchema,
     confirmPassword: z.string(),
-    acceptTerms: z.literal(true, { errorMap: () => ({ message: "Şartları kabul etmelisin" }) }),
+    acceptTerms: z.literal(true, { error: "Şartları kabul etmelisin" }),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "Şifreler eşleşmiyor",
