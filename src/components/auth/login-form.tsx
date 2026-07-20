@@ -4,7 +4,10 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import type { z } from "zod";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
+
+type LoginFormValues = z.input<typeof loginSchema>;
 import { loginAction, type ActionState } from "@/server/actions/auth-actions";
 import { TextField, PasswordField } from "@/components/auth/form-controls";
 import { FormBanner, SubmitButton } from "@/components/auth/form-parts";
@@ -17,7 +20,10 @@ export function LoginForm({ csrf }: { csrf: string }) {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { rememberMe: false } });
+  } = useForm<LoginFormValues, unknown, LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { rememberMe: false },
+  });
 
   const onSubmit = (values: LoginInput) => {
     const fd = new FormData();
