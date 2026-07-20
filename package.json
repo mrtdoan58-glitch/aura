@@ -46,7 +46,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
     "@lhci/cli": "^0.15.1",
-    "@next/bundle-analyzer": "^15.5.20",
+    "@next/bundle-analyzer": "^16.2.10",
     "@playwright/test": "^1.50.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.0",
