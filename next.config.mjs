@@ -64,9 +64,8 @@ export default withSentryConfig(config, {
   project: process.env.SENTRY_PROJECT,
   silent: true,
   widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: false,
   // SENTRY_AUTH_TOKEN henüz ayarlanmadı, yani source map yüklenemez —
   // üretmek yalnızca minified kaynağı gereksiz yere herkese açık sunar.
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  webpack: { treeshake: { removeDebugLogging: true }, automaticVercelMonitors: false },
 });
