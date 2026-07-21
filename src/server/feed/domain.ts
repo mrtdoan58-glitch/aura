@@ -86,6 +86,9 @@ export interface NewPostMedia {
 export interface PostRepository {
   /** Zaman-sıralı feed; cursor = son gönderinin `createdAt|id` bileşik anahtarı. */
   listFeed(params: CursorParams): Promise<CursorPage<Post>>;
+  /** Bir kullanıcının profil ızgarası — aynı cursor semantiği, authorId ile filtreli. */
+  listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>>;
+  countByAuthor(authorId: string): Promise<number>;
   findById(id: string): Promise<Post | null>;
   incrementLikeCount(id: string, delta: number): Promise<void>;
   incrementCommentCount(id: string, delta: number): Promise<void>;

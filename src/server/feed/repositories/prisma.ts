@@ -80,6 +80,28 @@ export class PrismaPostRepository implements PostRepository {
     };
   }
 
+  async listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>> {
+    const limit = Math.min(Math.max(params.limit, 1), 50);
+    const or = cursorOr(params.cursor);
+    const rows = await prisma.post.findMany({
+      where: { authorId, deletedAt: null, ...(or ? { OR: or } : {}) },
+      include: { author: true, media: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    });
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      items: page.map(toPost),
+      nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null,
+    };
+  }
+
+  async countByAuthor(authorId: string): Promise<number> {
+    return prisma.post.count({ where: { authorId, deletedAt: null } });
+  }
+
   async findById(id: string): Promise<Post | null> {
     const row = await prisma.post.findUnique({ where: { id }, include: { author: true, media: true } });
     return row ? toPost(row) : null;

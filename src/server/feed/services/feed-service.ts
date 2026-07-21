@@ -74,6 +74,20 @@ export class FeedService {
     return enriched;
   }
 
+  /** Bir kullanıcının profil ızgarası (bkz. server/social — takip/profil o modülde). */
+  async getUserPosts(
+    authorId: string,
+    params: { cursor?: string | null; limit?: number },
+    viewerId: string | null
+  ): Promise<CursorPage<PostView>> {
+    const page = await this.deps.posts.listByAuthor(authorId, { cursor: params.cursor, limit: clampLimit(params.limit) });
+    return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
+  }
+
+  async countPostsByAuthor(authorId: string): Promise<number> {
+    return this.deps.posts.countByAuthor(authorId);
+  }
+
   async getSaved(
     params: { cursor?: string | null; limit?: number },
     viewerId: string

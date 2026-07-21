@@ -22,6 +22,12 @@ export async function register() {
       const { configureFeedDeps } = await import("@/server/feed/container");
       const { buildPrismaFeedDeps } = await import("@/server/feed/prisma-deps");
       configureFeedDeps(buildPrismaFeedDeps());
+
+      // social, users/posts için yukarıdaki auth/feed servislerini yeniden kullanır
+      // (bkz. server/social/prisma-deps.ts) — bu yüzden ikisinden SONRA yapılandırılır.
+      const { configureSocialDeps } = await import("@/server/social/container");
+      const { buildPrismaSocialDeps } = await import("@/server/social/prisma-deps");
+      configureSocialDeps(buildPrismaSocialDeps());
     }
   }
 }

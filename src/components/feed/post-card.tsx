@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { BadgeCheck, MoreHorizontal, Heart, MessageCircle, Send, Bookmark } from "lucide-react";
 import type { PostDTO } from "@/lib/feed/types";
@@ -50,12 +51,14 @@ export const PostCard = memo(function PostCard({ post, priority }: { post: PostD
   return (
     <article className="mb-5 overflow-hidden rounded-[22px] border border-border bg-bg shadow-soft">
       <header className="flex items-center gap-3 p-3.5">
-        <Avatar src={post.author.avatarUrl} size={42} />
+        <Link href={`/profile/${post.author.username}`} className="shrink-0">
+          <Avatar src={post.author.avatarUrl} size={42} />
+        </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[14.5px] font-bold">
+          <Link href={`/profile/${post.author.username}`} className="flex items-center gap-1.5 text-[14.5px] font-bold hover:underline">
             {post.author.name}
             {post.author.verified && <BadgeCheck className="h-3.5 w-3.5 text-primary" />}
-          </div>
+          </Link>
           <div className="text-xs font-medium text-fg-3">
             {relativeTime(post.createdAt)}
             {post.location && ` · ${post.location}`}

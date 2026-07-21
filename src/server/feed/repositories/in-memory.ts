@@ -33,6 +33,12 @@ export class InMemoryPostRepository implements PostRepository {
   async listFeed(params: CursorParams) {
     return paginate(this.posts, params);
   }
+  async listByAuthor(authorId: string, params: CursorParams) {
+    return paginate(this.posts.filter((p) => p.author.id === authorId), params);
+  }
+  async countByAuthor(authorId: string) {
+    return this.posts.filter((p) => p.author.id === authorId).length;
+  }
   async findById(id: string) {
     return this.posts.find((p) => p.id === id) ?? null;
   }
