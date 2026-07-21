@@ -44,7 +44,7 @@ jobs:
         env:
           AUTH_DRIVER: memory
       - name: Bundle analyze
-        run: ANALYZE=true npm run build
+        run: npm run analyze
       - uses: actions/upload-artifact@v7
         with:
           name: bundle-report
