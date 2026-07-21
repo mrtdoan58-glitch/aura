@@ -3,10 +3,16 @@
  * Boş bir feed yerine tanıdık bir demo deneyimi için birden çok yazar, gönderi ve
  * hikaye oluşturur (in-memory sürücünün `src/server/feed/seed.ts`'iyle aynı ruhta).
  */
-import { PrismaClient } from "@prisma/client";
+import { config } from "dotenv";
+import { PrismaClient } from "../src/generated/prisma/client";
+
+config({ path: ".env.local" });
+config();
+import { PrismaPg } from "@prisma/adapter-pg";
 import { randomBytes, scryptSync } from "node:crypto";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 function hash(pw: string): string {
   const salt = randomBytes(16);

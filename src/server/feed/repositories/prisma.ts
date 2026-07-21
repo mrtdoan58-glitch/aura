@@ -9,7 +9,7 @@ import type {
   Post, Comment, Story, Author, CursorParams, CursorPage,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
 } from "@/server/feed/domain";
-import type { Prisma, User } from "@prisma/client";
+import type { Prisma, User } from "@/generated/prisma/client";
 
 function toAuthor(user: User): Author {
   return {
