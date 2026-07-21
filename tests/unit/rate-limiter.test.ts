@@ -3,7 +3,7 @@ import { InMemoryRateLimiter } from "@/server/rate-limit/rate-limiter";
 
 describe("InMemoryRateLimiter (sliding window)", () => {
   it("allows up to the limit then blocks", async () => {
-    let t = 1000;
+    const t = 1000;
     const rl = new InMemoryRateLimiter(3, 1000, () => t);
     expect((await rl.consume("k")).allowed).toBe(true);
     expect((await rl.consume("k")).allowed).toBe(true);

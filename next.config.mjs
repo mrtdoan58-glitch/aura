@@ -57,8 +57,11 @@ if (process.env.ANALYZE === "true") {
   config = withBundleAnalyzer({ enabled: true, openAnalyzer: false })(baseConfig);
 }
 
-// withSentryConfig, sentry.client.config.ts'i client bundle'a enjekte eder ve
-// build sırasında source map yükler (SENTRY_AUTH_TOKEN yoksa sessizce atlar).
+// Client-side init artık src/instrumentation-client.ts'de (Next'in kendi
+// dosya konvansiyonuyla otomatik yükleniyor — Turbopack altında eski
+// sentry.client.config.ts enjeksiyonu çalışmıyordu). withSentryConfig burada
+// yalnızca build sırasında source map yüklemek için kalıyor (SENTRY_AUTH_TOKEN
+// yoksa sessizce atlar).
 export default withSentryConfig(config, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,

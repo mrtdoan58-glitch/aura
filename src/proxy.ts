@@ -20,7 +20,7 @@ function generateCsrfTokenEdge(): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
   const existingCsrf = req.cookies.get(CSRF_COOKIE)?.value;

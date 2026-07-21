@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { AuthService } from "@/server/auth/services/auth-service";
 import { buildInMemoryDeps } from "@/server/auth/container";
 import type { AuthDeps } from "@/server/auth/services/auth-service";
@@ -162,7 +162,7 @@ describe("AuthService — password reset", () => {
   });
 
   it("resets the password and revokes sessions", async () => {
-    const { service, deps, mailer } = setup();
+    const { service, mailer } = setup();
     const u = await service.register(VALID);
     await service.login({ email: VALID.email, password: VALID.password });
     await service.requestPasswordReset(VALID.email);

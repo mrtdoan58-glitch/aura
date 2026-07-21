@@ -17,6 +17,10 @@ export function RegisterForm({ csrf }: { csrf: string }) {
     watch,
     formState: { errors },
   } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), mode: "onTouched" });
+  // react-hook-form'un watch() dönüşü doğası gereği memoize edilemez (canlı alan
+  // değeri okur); React Compiler bu bileşeni bu yüzden atlıyor — kütüphane
+  // kısıtı, kodda düzeltilecek bir şey yok.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const password = watch("password") ?? "";
 
   const onSubmit = (values: RegisterInput) => {

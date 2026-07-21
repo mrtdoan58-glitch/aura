@@ -16,6 +16,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored = (typeof window !== "undefined" && localStorage.getItem("aura-theme")) as Theme | null;
     const initial =
       stored ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    // localStorage/matchMedia yalnızca client'ta var; sunucu her zaman "light"
+    // render eder (bkz. layout.tsx'teki suppressHydrationWarning). Bu yüzden
+    // gerçek tema, hydration sonrası bilerek bir effect'te senkronize ediliyor —
+    // lazy useState initializer'ı burada hydration mismatch'e yol açar.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
   }, []);
 

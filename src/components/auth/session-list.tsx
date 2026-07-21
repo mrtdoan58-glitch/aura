@@ -21,6 +21,7 @@ function deviceIcon(label: string | null) {
 function LastUsedDate({ date }: { date: Date | string }) {
   const [text, setText] = useState<string | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setText(new Date(date).toLocaleDateString("tr-TR"));
   }, [date]);
   return <>{text ?? "…"}</>;

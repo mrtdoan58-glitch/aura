@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { FeedService } from "@/server/feed/services/feed-service";
-import { buildInMemoryFeedDeps } from "@/server/feed/container";
 import { seedPosts } from "@/server/feed/seed";
 import {
   InMemoryPostRepository, InMemoryLikeRepository, InMemorySaveRepository,
