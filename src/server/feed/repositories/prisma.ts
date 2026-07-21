@@ -6,7 +6,7 @@
 import { prisma } from "@/server/db/prisma";
 import { decodeCursor, encodeCursor } from "@/server/feed/cursor";
 import type {
-  Post, Comment, Story, Author, CursorParams, CursorPage,
+  Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
 } from "@/server/feed/domain";
 import type { Prisma, User } from "@/generated/prisma/client";
@@ -91,6 +91,30 @@ export class PrismaPostRepository implements PostRepository {
 
   async incrementCommentCount(id: string, delta: number): Promise<void> {
     await prisma.post.update({ where: { id }, data: { commentCount: { increment: delta } } });
+  }
+
+  async create(data: { author: Author; caption: string; tags: string[]; location: string | null; media: NewPostMedia[] }): Promise<Post> {
+    const row = await prisma.post.create({
+      data: {
+        authorId: data.author.id,
+        caption: data.caption,
+        tags: data.tags,
+        location: data.location,
+        media: {
+          create: data.media.map((m, order) => ({
+            type: m.type,
+            url: m.url,
+            posterUrl: m.posterUrl,
+            width: m.width,
+            height: m.height,
+            blurDataUrl: m.blurDataUrl,
+            order,
+          })),
+        },
+      },
+      include: { author: true, media: true },
+    });
+    return toPost(row);
   }
 }
 

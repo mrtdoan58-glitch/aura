@@ -74,12 +74,22 @@ export interface CursorParams {
 
 /* ------------------------- Repository arayüzleri ------------------------- */
 
+export interface NewPostMedia {
+  type: MediaType;
+  url: string;
+  posterUrl: string | null;
+  width: number;
+  height: number;
+  blurDataUrl: string | null;
+}
+
 export interface PostRepository {
   /** Zaman-sıralı feed; cursor = son gönderinin `createdAt|id` bileşik anahtarı. */
   listFeed(params: CursorParams): Promise<CursorPage<Post>>;
   findById(id: string): Promise<Post | null>;
   incrementLikeCount(id: string, delta: number): Promise<void>;
   incrementCommentCount(id: string, delta: number): Promise<void>;
+  create(data: { author: Author; caption: string; tags: string[]; location: string | null; media: NewPostMedia[] }): Promise<Post>;
 }
 
 export interface LikeRepository {

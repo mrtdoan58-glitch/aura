@@ -4,7 +4,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type {
-  Post, Comment, Story, Author, CursorParams, CursorPage,
+  Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
 } from "@/server/feed/domain";
 import { encodeCursor, decodeCursor, isAfterCursor } from "@/server/feed/cursor";
@@ -43,6 +43,21 @@ export class InMemoryPostRepository implements PostRepository {
   async incrementCommentCount(id: string, delta: number) {
     const p = this.posts.find((x) => x.id === id);
     if (p) p.commentCount = Math.max(0, p.commentCount + delta);
+  }
+  async create(data: { author: Author; caption: string; tags: string[]; location: string | null; media: NewPostMedia[] }): Promise<Post> {
+    const post: Post = {
+      id: randomUUID(),
+      author: data.author,
+      media: data.media.map((m, order) => ({ ...m, id: randomUUID(), order })),
+      caption: data.caption,
+      tags: data.tags,
+      location: data.location,
+      likeCount: 0,
+      commentCount: 0,
+      createdAt: new Date(),
+    };
+    this.posts.unshift(post);
+    return post;
   }
   /** Test yardımcıları */
   all() {

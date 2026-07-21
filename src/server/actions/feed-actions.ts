@@ -4,14 +4,22 @@
  * Feed mutation action'ları. Kimlik doğrulama zorunlu; hata tek tip zarfta döner.
  * (Next Server Actions yerleşik origin/CSRF korumasına sahiptir.)
  */
+import { put } from "@vercel/blob";
+import { randomUUID } from "node:crypto";
 import { getFeedService, FeedError } from "@/server/feed/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
-import type { Comment } from "@/server/feed/domain";
-import type { CommentDTO } from "@/lib/feed/types";
+import type { Comment, Post, NewPostMedia } from "@/server/feed/domain";
+import type { CommentDTO, PostDTO } from "@/lib/feed/types";
 
 function toDTO(c: Comment): CommentDTO {
   return { ...c, createdAt: c.createdAt.toISOString() };
 }
+
+function toPostDTO(p: Post): PostDTO {
+  return { ...p, createdAt: p.createdAt.toISOString(), likedByMe: false, savedByMe: false };
+}
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
 
 export interface ActionResult<T> {
   ok: boolean;
@@ -65,6 +73,61 @@ export async function addCommentAction(postId: string, text: string): Promise<Ac
   try {
     const comment = await getFeedService().addComment(postId, author, text);
     return { ok: true, data: toDTO(comment) };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
+/**
+ * `media`, `width`, `height` alanları FormData'da eşleşen sırayla, üçlü olarak
+ * eklenir (bkz. create/page.tsx) — her dosyanın boyutu tarayıcıda önizleme
+ * sırasında zaten okunuyor, sunucuda tekrar görsel işlemeye (ör. sharp) gerek
+ * kalmaması için client'tan taşınıyor.
+ */
+export async function createPostAction(formData: FormData): Promise<ActionResult<PostDTO>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+
+  const caption = (formData.get("caption") as string | null) ?? "";
+  const tagsRaw = (formData.get("tags") as string | null) ?? "";
+  const location = (formData.get("location") as string | null)?.trim() || null;
+  const tags = [...new Set(tagsRaw.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean))];
+
+  const files = formData.getAll("media").filter((v): v is File => v instanceof File);
+  const widths = formData.getAll("width").map(Number);
+  const heights = formData.getAll("height").map(Number);
+
+  if (files.length === 0) return { ok: false, error: "En az bir fotoğraf gerekli.", code: "INVALID_INPUT" };
+  if (files.length > 10) return { ok: false, error: "En fazla 10 medya eklenebilir.", code: "INVALID_INPUT" };
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) {
+      return { ok: false, error: "Yalnızca resim dosyaları desteklenir.", code: "INVALID_INPUT" };
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      return { ok: false, error: "Dosya çok büyük (en fazla 10MB).", code: "INVALID_INPUT" };
+    }
+  }
+
+  try {
+    const media: NewPostMedia[] = await Promise.all(
+      files.map(async (file, i) => {
+        const blob = await put(`posts/${author.id}/${randomUUID()}-${file.name}`, file, {
+          access: "public",
+          addRandomSuffix: false,
+        });
+        return {
+          type: "image" as const,
+          url: blob.url,
+          posterUrl: null,
+          width: widths[i] > 0 ? widths[i] : 1080,
+          height: heights[i] > 0 ? heights[i] : 1350,
+          blurDataUrl: null,
+        };
+      })
+    );
+    const post = await getFeedService().createPost(author, { caption, tags, location, media });
+    return { ok: true, data: toPostDTO(post) };
   } catch (e) {
     if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
     return { ok: false, error: "Beklenmeyen bir hata oluştu." };

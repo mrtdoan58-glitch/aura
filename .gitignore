@@ -5,6 +5,7 @@
 .DS_Store
 *.pem
 .env*
+!.env.example
 .vercel
 next-env.d.ts
 *.tsbuildinfo

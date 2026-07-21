@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient, useMutation, type InfiniteData } from "@tanstack/react-query";
-import { toggleLikeAction, toggleSaveAction } from "@/server/actions/feed-actions";
+import { toggleLikeAction, toggleSaveAction, createPostAction } from "@/server/actions/feed-actions";
 import type { CursorPageDTO, PostDTO } from "@/lib/feed/types";
 
 type FeedData = InfiniteData<CursorPageDTO<PostDTO>>;
@@ -61,5 +61,12 @@ export function usePostActions() {
     },
   });
 
-  return { like, save };
+  const create = useMutation({
+    mutationFn: (formData: FormData) => createPostAction(formData),
+    onSuccess: (res) => {
+      if (res.ok) qc.invalidateQueries({ queryKey: ["feed"] });
+    },
+  });
+
+  return { like, save, create };
 }

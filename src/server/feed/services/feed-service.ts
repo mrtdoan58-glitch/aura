@@ -5,7 +5,7 @@
  */
 import type {
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
-  CursorPage, PostView, Post, Comment, Story, Author,
+  CursorPage, PostView, Post, Comment, Story, Author, NewPostMedia,
 } from "@/server/feed/domain";
 import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
 
@@ -16,12 +16,16 @@ export interface FeedDeps {
   comments: CommentRepository;
   stories: StoryRepository;
   commentRateLimiter?: RateLimiter;
+  postRateLimiter?: RateLimiter;
   now?: () => Date;
 }
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 30;
 const MAX_COMMENT_LEN = 1000;
+const MAX_CAPTION_LEN = 2200;
+const MAX_MEDIA_COUNT = 10;
+const MAX_TAGS_COUNT = 30;
 
 export class FeedError extends Error {
   constructor(
@@ -123,6 +127,27 @@ export class FeedService {
     const comment = await this.deps.comments.add({ postId, author, text: trimmed });
     await this.deps.posts.incrementCommentCount(postId, 1);
     return comment;
+  }
+
+  /* --------------------------- Gönderi oluşturma --------------------------- */
+  async createPost(
+    author: Author,
+    data: { caption: string; tags: string[]; location: string | null; media: NewPostMedia[] }
+  ): Promise<Post> {
+    const trimmed = data.caption.trim();
+    if (!trimmed) throw new FeedError("INVALID_INPUT", "Başlık boş olamaz.");
+    if (trimmed.length > MAX_CAPTION_LEN) throw new FeedError("INVALID_INPUT", "Başlık çok uzun.");
+    if (data.media.length === 0) throw new FeedError("INVALID_INPUT", "En az bir fotoğraf veya video gerekli.");
+    if (data.media.length > MAX_MEDIA_COUNT) throw new FeedError("INVALID_INPUT", "En fazla 10 medya eklenebilir.");
+    if (data.tags.length > MAX_TAGS_COUNT) throw new FeedError("INVALID_INPUT", "En fazla 30 etiket eklenebilir.");
+    for (const m of data.media) {
+      if (!m.url || m.width <= 0 || m.height <= 0) throw new FeedError("INVALID_INPUT", "Geçersiz medya.");
+    }
+    if (this.deps.postRateLimiter) {
+      const rl = await this.deps.postRateLimiter.consume(`post:${author.id}`);
+      if (!rl.allowed) throw new FeedError("RATE_LIMITED", "Çok hızlı paylaşım yapıyorsun. Biraz bekle.");
+    }
+    return this.deps.posts.create({ author, caption: trimmed, tags: data.tags, location: data.location, media: data.media });
   }
 
   /* --------------------------- Hikayeler --------------------------- */

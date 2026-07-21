@@ -22,6 +22,15 @@ function buildCommentRateLimiter(): RateLimiter {
   return new InMemoryRateLimiter(10, 60 * 1000);
 }
 
+function buildPostRateLimiter(): RateLimiter {
+  const env = getEnv();
+  if (env.KV_REST_API_URL && env.KV_REST_API_TOKEN) {
+    const redis = new Redis({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN });
+    return new RedisRateLimiter(redis, 5, 60 * 60 * 1000);
+  }
+  return new InMemoryRateLimiter(5, 60 * 60 * 1000);
+}
+
 export function buildPrismaFeedDeps(): FeedDeps {
   return {
     posts: new PrismaPostRepository(),
@@ -30,5 +39,6 @@ export function buildPrismaFeedDeps(): FeedDeps {
     comments: new PrismaCommentRepository(),
     stories: new PrismaStoryRepository(),
     commentRateLimiter: buildCommentRateLimiter(),
+    postRateLimiter: buildPostRateLimiter(),
   };
 }

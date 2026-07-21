@@ -162,6 +162,78 @@ describe("FeedService — negative & edge cases", () => {
   });
 });
 
+describe("FeedService — createPost", () => {
+  const VALID_MEDIA = [{ type: "image" as const, url: "https://x.test/a.jpg", posterUrl: null, width: 1080, height: 1350, blurDataUrl: null }];
+
+  it("creates a post and it appears at the top of the feed", async () => {
+    const { service } = setup(3);
+    const post = await service.createPost(AUTHOR, { caption: "Yeni gönderi", tags: ["a", "b"], location: "İstanbul", media: VALID_MEDIA });
+    expect(post.caption).toBe("Yeni gönderi");
+    expect(post.tags).toEqual(["a", "b"]);
+    expect(post.media).toHaveLength(1);
+    expect(post.likeCount).toBe(0);
+    const page = await service.getFeed({ limit: 1 }, null);
+    expect(page.items[0].id).toBe(post.id);
+  });
+
+  it("trims caption and rejects empty/too-long captions", async () => {
+    const { service } = setup(1);
+    const post = await service.createPost(AUTHOR, { caption: "  merhaba  ", tags: [], location: null, media: VALID_MEDIA });
+    expect(post.caption).toBe("merhaba");
+    await expect(
+      service.createPost(AUTHOR, { caption: "   ", tags: [], location: null, media: VALID_MEDIA })
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    await expect(
+      service.createPost(AUTHOR, { caption: "x".repeat(2201), tags: [], location: null, media: VALID_MEDIA })
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("rejects a post with no media", async () => {
+    const { service } = setup(1);
+    await expect(
+      service.createPost(AUTHOR, { caption: "resimsiz", tags: [], location: null, media: [] })
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("rejects more than 10 media items", async () => {
+    const { service } = setup(1);
+    const tooMany = Array.from({ length: 11 }, () => VALID_MEDIA[0]);
+    await expect(
+      service.createPost(AUTHOR, { caption: "çok medya", tags: [], location: null, media: tooMany })
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("rejects media with invalid dimensions", async () => {
+    const { service } = setup(1);
+    const bad = [{ ...VALID_MEDIA[0], width: 0 }];
+    await expect(
+      service.createPost(AUTHOR, { caption: "bozuk boyut", tags: [], location: null, media: bad })
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});
+
+describe("FeedService — post rate limiting", () => {
+  it("blocks post spam beyond the limit", async () => {
+    const posts = new InMemoryPostRepository(seedPosts(1));
+    const { InMemoryRateLimiter } = await import("@/server/rate-limit/rate-limiter");
+    const deps = {
+      posts,
+      likes: new InMemoryLikeRepository(),
+      saves: new InMemorySaveRepository(posts),
+      comments: new InMemoryCommentRepository(),
+      stories: new InMemoryStoryRepository(),
+      postRateLimiter: new InMemoryRateLimiter(2, 60_000),
+    };
+    const svc = new FeedService(deps);
+    const media = [{ type: "image" as const, url: "https://x.test/a.jpg", posterUrl: null, width: 1080, height: 1350, blurDataUrl: null }];
+    await svc.createPost(AUTHOR, { caption: "1", tags: [], location: null, media });
+    await svc.createPost(AUTHOR, { caption: "2", tags: [], location: null, media });
+    await expect(
+      svc.createPost(AUTHOR, { caption: "3", tags: [], location: null, media })
+    ).rejects.toMatchObject({ code: "RATE_LIMITED" });
+  });
+});
+
 describe("FeedService — comment rate limiting", () => {
   it("blocks comment spam beyond the limit", async () => {
     const posts = new InMemoryPostRepository(seedPosts(1));
