@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Layers } from "lucide-react";
 import { useProfilePosts } from "@/hooks/use-profile-posts";
 import { useIntersection } from "@/hooks/use-intersection";
@@ -34,7 +35,11 @@ export function ProfilePostsGrid({ username }: { username: string }) {
   return (
     <div className="grid grid-cols-3 gap-[3px] p-[3px]">
       {posts.map((post) => (
-        <div key={post.id} className="relative aspect-square overflow-hidden bg-surface-2">
+        <Link
+          key={post.id}
+          href={`/post/${post.id}`}
+          className="relative aspect-square overflow-hidden bg-surface-2"
+        >
           <Image
             src={post.media[0]?.url}
             alt=""
@@ -47,7 +52,7 @@ export function ProfilePostsGrid({ username }: { username: string }) {
               <Layers className="h-[17px] w-[17px]" fill="white" />
             </span>
           )}
-        </div>
+        </Link>
       ))}
       <div ref={sentinel} className="col-span-3 h-4" aria-hidden />
     </div>

@@ -33,6 +33,19 @@ export class InMemoryPostRepository implements PostRepository {
   async listFeed(params: CursorParams) {
     return paginate(this.posts, params);
   }
+  async listExplore(params: CursorParams): Promise<CursorPage<Post>> {
+    const limit = Math.min(Math.max(params.limit, 1), 50);
+    const offset = Math.max(0, Number(params.cursor) || 0);
+    const sorted = [...this.posts].sort(
+      (a, b) =>
+        b.likeCount - a.likeCount ||
+        b.createdAt.getTime() - a.createdAt.getTime() ||
+        (a.id < b.id ? 1 : -1)
+    );
+    const items = sorted.slice(offset, offset + limit);
+    const hasMore = sorted.length > offset + items.length;
+    return { items, nextCursor: hasMore ? String(offset + items.length) : null };
+  }
   async listByAuthor(authorId: string, params: CursorParams) {
     return paginate(this.posts.filter((p) => p.author.id === authorId), params);
   }

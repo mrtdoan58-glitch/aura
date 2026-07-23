@@ -86,6 +86,12 @@ export interface NewPostMedia {
 export interface PostRepository {
   /** Zaman-sıralı feed; cursor = son gönderinin `createdAt|id` bileşik anahtarı. */
   listFeed(params: CursorParams): Promise<CursorPage<Post>>;
+  /**
+   * Keşfet ızgarası — popülerliğe göre (likeCount DESC, createdAt DESC, id DESC).
+   * Sıralama anahtarı (likeCount) değişken olduğu için keyset yerine offset sayfalama:
+   * cursor = sayısal offset string'i.
+   */
+  listExplore(params: CursorParams): Promise<CursorPage<Post>>;
   /** Bir kullanıcının profil ızgarası — aynı cursor semantiği, authorId ile filtreli. */
   listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>>;
   countByAuthor(authorId: string): Promise<number>;

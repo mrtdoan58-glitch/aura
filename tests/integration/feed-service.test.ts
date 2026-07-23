@@ -54,6 +54,39 @@ describe("FeedService — cursor pagination", () => {
   });
 });
 
+describe("FeedService — explore (popularity + offset paging)", () => {
+  it("orders by likeCount descending", async () => {
+    const { service } = setup(20);
+    const page = await service.getExplore({ limit: 20 }, null);
+    const likes = page.items.map((p) => p.likeCount);
+    const sorted = [...likes].sort((a, b) => b - a);
+    expect(likes).toEqual(sorted);
+  });
+
+  it("paginates every post exactly once via offset cursor", async () => {
+    const { service } = setup(20);
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const page = await service.getExplore({ cursor, limit: 7 }, VIEWER);
+      page.items.forEach((p) => seen.add(p.id));
+      cursor = page.nextCursor;
+      expect(++pages).toBeLessThan(10);
+    } while (cursor);
+    expect(seen.size).toBe(20);
+  });
+
+  it("reflects viewer like state after a like", async () => {
+    const { service } = setup(5);
+    const first = (await service.getExplore({ limit: 5 }, VIEWER)).items[0];
+    expect(first.likedByMe).toBe(false);
+    await service.setLike(first.id, VIEWER, true);
+    const after = (await service.getExplore({ limit: 5 }, VIEWER)).items.find((p) => p.id === first.id);
+    expect(after?.likedByMe).toBe(true);
+  });
+});
+
 describe("FeedService — like/save (idempotent + counters)", () => {
   it("likes and unlikes, keeping the counter consistent", async () => {
     const { service } = setup(3);

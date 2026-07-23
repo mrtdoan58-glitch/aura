@@ -69,6 +69,15 @@ export class FeedService {
     return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
   }
 
+  /** Keşfet ızgarası — popülerliğe göre sıralı, offset sayfalamalı (bkz. repo). */
+  async getExplore(
+    params: { cursor?: string | null; limit?: number },
+    viewerId: string | null
+  ): Promise<CursorPage<PostView>> {
+    const page = await this.deps.posts.listExplore({ cursor: params.cursor, limit: clampLimit(params.limit) });
+    return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
+  }
+
   async getPost(id: string, viewerId: string | null): Promise<PostView> {
     const post = await this.deps.posts.findById(id);
     if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");
