@@ -129,6 +129,45 @@ describe("FeedService — stories", () => {
     const after = await service.getStories(VIEWER);
     expect(after.find((s) => s.id === first.id)?.seenByMe).toBe(true);
   });
+
+  it("creates a story that appears in the active list with a ~24h expiry", async () => {
+    const { service } = setup(1);
+    const before = Date.now();
+    const story = await service.createStory(AUTHOR, { mediaUrl: "https://x.test/s.jpg", type: "image" });
+    expect(story.media.url).toBe("https://x.test/s.jpg");
+    expect(story.seenByMe).toBe(false);
+    const ttl = story.expiresAt.getTime() - before;
+    expect(ttl).toBeGreaterThan(23 * 60 * 60 * 1000);
+    expect(ttl).toBeLessThanOrEqual(24 * 60 * 60 * 1000 + 1000);
+    const active = await service.getStories(null);
+    expect(active.map((s) => s.id)).toContain(story.id);
+  });
+
+  it("rejects a story with no media url", async () => {
+    const { service } = setup(1);
+    await expect(service.createStory(AUTHOR, { mediaUrl: "", type: "image" })).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+    });
+  });
+
+  it("rate-limits story spam beyond the limit", async () => {
+    const posts = new InMemoryPostRepository(seedPosts(1));
+    const { InMemoryRateLimiter } = await import("@/server/rate-limit/rate-limiter");
+    const deps = {
+      posts,
+      likes: new InMemoryLikeRepository(),
+      saves: new InMemorySaveRepository(posts),
+      comments: new InMemoryCommentRepository(),
+      stories: new InMemoryStoryRepository(),
+      storyRateLimiter: new InMemoryRateLimiter(2, 60_000),
+    };
+    const svc = new FeedService(deps);
+    await svc.createStory(AUTHOR, { mediaUrl: "https://x.test/1.jpg", type: "image" });
+    await svc.createStory(AUTHOR, { mediaUrl: "https://x.test/2.jpg", type: "image" });
+    await expect(svc.createStory(AUTHOR, { mediaUrl: "https://x.test/3.jpg", type: "image" })).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+    });
+  });
 });
 
 describe("FeedService — negative & edge cases", () => {

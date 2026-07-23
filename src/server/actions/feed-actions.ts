@@ -8,8 +8,8 @@ import { put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { getFeedService, FeedError } from "@/server/feed/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
-import type { Comment, Post, NewPostMedia } from "@/server/feed/domain";
-import type { CommentDTO, PostDTO } from "@/lib/feed/types";
+import type { Comment, Post, Story, NewPostMedia } from "@/server/feed/domain";
+import type { CommentDTO, PostDTO, StoryDTO } from "@/lib/feed/types";
 
 function toDTO(c: Comment): CommentDTO {
   return { ...c, createdAt: c.createdAt.toISOString() };
@@ -17,6 +17,10 @@ function toDTO(c: Comment): CommentDTO {
 
 function toPostDTO(p: Post): PostDTO {
   return { ...p, createdAt: p.createdAt.toISOString(), likedByMe: false, savedByMe: false };
+}
+
+function toStoryDTO(s: Story): StoryDTO {
+  return { ...s, createdAt: s.createdAt.toISOString(), expiresAt: s.expiresAt.toISOString() };
 }
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -139,4 +143,30 @@ export async function markStorySeenAction(storyId: string): Promise<ActionResult
   if (!author) return { ok: true, data: null };
   await getFeedService().markStorySeen(storyId, author.id);
   return { ok: true, data: null };
+}
+
+export async function createStoryAction(formData: FormData): Promise<ActionResult<StoryDTO>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+
+  const file = formData.get("media");
+  if (!(file instanceof File)) return { ok: false, error: "Bir fotoğraf seç.", code: "INVALID_INPUT" };
+  if (!file.type.startsWith("image/")) {
+    return { ok: false, error: "Yalnızca resim dosyaları desteklenir.", code: "INVALID_INPUT" };
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return { ok: false, error: "Dosya çok büyük (en fazla 10MB).", code: "INVALID_INPUT" };
+  }
+
+  try {
+    const blob = await put(`stories/${author.id}/${randomUUID()}-${file.name}`, file, {
+      access: "public",
+      addRandomSuffix: false,
+    });
+    const story = await getFeedService().createStory(author, { mediaUrl: blob.url, type: "image" });
+    return { ok: true, data: toStoryDTO(story) };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
 }

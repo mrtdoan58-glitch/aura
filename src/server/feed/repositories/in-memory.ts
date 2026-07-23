@@ -4,7 +4,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type {
-  Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia,
+  Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
 } from "@/server/feed/domain";
 import { encodeCursor, decodeCursor, isAfterCursor } from "@/server/feed/cursor";
@@ -159,5 +159,18 @@ export class InMemoryStoryRepository implements StoryRepository {
   }
   async markSeen(storyId: string, viewerId: string) {
     this.seen.add(`${viewerId}:${storyId}`);
+  }
+  async create(data: { author: Author; mediaUrl: string; type: MediaType; expiresAt: Date }): Promise<Story> {
+    const id = randomUUID();
+    const story: Story = {
+      id,
+      author: data.author,
+      media: { id, type: data.type, url: data.mediaUrl, posterUrl: null, width: 1080, height: 1350, blurDataUrl: null, order: 0 },
+      createdAt: new Date(),
+      expiresAt: data.expiresAt,
+      seenByMe: false,
+    };
+    this.stories.unshift(story);
+    return story;
   }
 }

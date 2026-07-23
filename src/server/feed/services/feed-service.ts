@@ -5,7 +5,7 @@
  */
 import type {
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
-  CursorPage, PostView, Post, Comment, Story, Author, NewPostMedia,
+  CursorPage, PostView, Post, Comment, Story, Author, NewPostMedia, MediaType,
 } from "@/server/feed/domain";
 import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
 
@@ -17,6 +17,7 @@ export interface FeedDeps {
   stories: StoryRepository;
   commentRateLimiter?: RateLimiter;
   postRateLimiter?: RateLimiter;
+  storyRateLimiter?: RateLimiter;
   now?: () => Date;
 }
 
@@ -26,6 +27,7 @@ const MAX_COMMENT_LEN = 1000;
 const MAX_CAPTION_LEN = 2200;
 const MAX_MEDIA_COUNT = 10;
 const MAX_TAGS_COUNT = 30;
+const STORY_TTL_MS = 24 * 60 * 60 * 1000; // hikaye 24 saat sonra kaybolur
 
 export class FeedError extends Error {
   constructor(
@@ -171,5 +173,15 @@ export class FeedService {
   async markStorySeen(storyId: string, viewerId: string): Promise<void> {
     if (!viewerId) return;
     await this.deps.stories.markSeen(storyId, viewerId);
+  }
+
+  async createStory(author: Author, data: { mediaUrl: string; type: MediaType }): Promise<Story> {
+    if (!data.mediaUrl) throw new FeedError("INVALID_INPUT", "Geçersiz medya.");
+    if (this.deps.storyRateLimiter) {
+      const rl = await this.deps.storyRateLimiter.consume(`story:${author.id}`);
+      if (!rl.allowed) throw new FeedError("RATE_LIMITED", "Çok hızlı hikaye paylaşıyorsun. Biraz bekle.");
+    }
+    const expiresAt = new Date(this.now().getTime() + STORY_TTL_MS);
+    return this.deps.stories.create({ author, mediaUrl: data.mediaUrl, type: data.type, expiresAt });
   }
 }

@@ -6,7 +6,7 @@
 import { prisma } from "@/server/db/prisma";
 import { decodeCursor, encodeCursor } from "@/server/feed/cursor";
 import type {
-  Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia,
+  Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
 } from "@/server/feed/domain";
 import type { Prisma, User } from "@/generated/prisma/client";
@@ -295,6 +295,20 @@ export class PrismaStoryRepository implements StoryRepository {
       create: { storyId, viewerId },
       update: {},
     });
+  }
+
+  async create(data: { author: Author; mediaUrl: string; type: MediaType; expiresAt: Date }): Promise<Story> {
+    const row = await prisma.story.create({
+      data: { authorId: data.author.id, mediaUrl: data.mediaUrl, type: data.type, expiresAt: data.expiresAt },
+    });
+    return {
+      id: row.id,
+      author: data.author,
+      media: { id: row.id, type: row.type, url: row.mediaUrl, posterUrl: null, width: 1080, height: 1350, blurDataUrl: null, order: 0 },
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+      seenByMe: false,
+    };
   }
 }
 

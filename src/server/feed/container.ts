@@ -28,6 +28,7 @@ export function buildInMemoryFeedDeps(): FeedDeps {
     stories: new InMemoryStoryRepository(),
     commentRateLimiter: new InMemoryRateLimiter(10, 60 * 1000),
     postRateLimiter: new InMemoryRateLimiter(5, 60 * 60 * 1000),
+    storyRateLimiter: new InMemoryRateLimiter(10, 60 * 60 * 1000),
   };
 }
 

@@ -119,4 +119,5 @@ export interface CommentRepository {
 export interface StoryRepository {
   listActive(now: Date, viewerId: string | null): Promise<Story[]>;
   markSeen(storyId: string, viewerId: string): Promise<void>;
+  create(data: { author: Author; mediaUrl: string; type: MediaType; expiresAt: Date }): Promise<Story>;
 }
