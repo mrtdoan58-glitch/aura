@@ -28,6 +28,11 @@ export async function register() {
       const { configureSocialDeps } = await import("@/server/social/container");
       const { buildPrismaSocialDeps } = await import("@/server/social/prisma-deps");
       configureSocialDeps(buildPrismaSocialDeps());
+
+      // notifications, follow-back durumu için social'ı kullanır — social'dan SONRA.
+      const { configureNotificationDeps } = await import("@/server/notifications/container");
+      const { buildPrismaNotificationDeps } = await import("@/server/notifications/prisma-deps");
+      configureNotificationDeps(buildPrismaNotificationDeps());
     }
   }
 }

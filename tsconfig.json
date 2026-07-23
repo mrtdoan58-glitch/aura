@@ -47,6 +47,8 @@
     "src/server/feed/repositories/prisma.ts",
     "src/server/social/prisma-deps.ts",
     "src/server/social/repositories/prisma.ts",
+    "src/server/notifications/prisma-deps.ts",
+    "src/server/notifications/repositories/prisma.ts",
     "src/server/db/prisma.ts",
     "tests/e2e/**"
   ]

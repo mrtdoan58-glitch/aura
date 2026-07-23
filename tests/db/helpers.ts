@@ -1,12 +1,23 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-/** Gerçek Postgres engine (WASM/PGlite) — sunucu/native gerektirmez, testlerde migration'ı çalıştırır. */
+/**
+ * Gerçek Postgres engine (WASM/PGlite) — sunucu/native gerektirmez, testlerde
+ * TÜM migration'ları sırayla uygular. Yeni bir migration eklendiğinde SQL'i
+ * burada (yani `npm run test`'te) doğrulanır — prod'a `migrate deploy` etmeden önce.
+ */
 export async function freshDb(): Promise<PGlite> {
   const db = new PGlite(); // bellek içi
-  const sql = readFileSync(resolve(__dirname, "../../prisma/migrations/0001_init/migration.sql"), "utf8");
-  await db.exec(sql);
+  const migrationsDir = resolve(__dirname, "../../prisma/migrations");
+  const dirs = readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  for (const dir of dirs) {
+    const sql = readFileSync(resolve(migrationsDir, dir, "migration.sql"), "utf8");
+    await db.exec(sql);
+  }
   return db;
 }
 

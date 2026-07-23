@@ -7,6 +7,7 @@
 import { put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { getFeedService, FeedError } from "@/server/feed/container-actions";
+import { notify } from "@/server/notifications/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { Comment, Post, Story, NewPostMedia } from "@/server/feed/domain";
 import type { CommentDTO, PostDTO, StoryDTO } from "@/lib/feed/types";
@@ -52,6 +53,17 @@ export async function toggleLikeAction(
   if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
   try {
     const res = await getFeedService().setLike(postId, author.id, liked);
+    if (liked) {
+      // Gönderi sahibine bildirim (kendi beğenisi hariç). Best-effort; hata like'ı bozmaz.
+      try {
+        const post = await getFeedService().getPost(postId, null);
+        if (post.author.id !== author.id) {
+          await notify({ recipientId: post.author.id, actor: author, type: "LIKE", postId, postImageUrl: post.media[0]?.url ?? null });
+        }
+      } catch {
+        /* bildirim best-effort */
+      }
+    }
     return { ok: true, data: res };
   } catch (e) {
     if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
@@ -76,6 +88,14 @@ export async function addCommentAction(postId: string, text: string): Promise<Ac
   if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
   try {
     const comment = await getFeedService().addComment(postId, author, text);
+    try {
+      const post = await getFeedService().getPost(postId, null);
+      if (post.author.id !== author.id) {
+        await notify({ recipientId: post.author.id, actor: author, type: "COMMENT", postId, postImageUrl: post.media[0]?.url ?? null, commentText: text.slice(0, 140) });
+      }
+    } catch {
+      /* bildirim best-effort */
+    }
     return { ok: true, data: toDTO(comment) };
   } catch (e) {
     if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };

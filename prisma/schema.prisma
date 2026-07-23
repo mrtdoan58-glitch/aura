@@ -43,6 +43,8 @@ model User {
   storyViews   StoryView[] @relation("UserStoryViews")
   following    Follow[]    @relation("Following")
   followers    Follow[]    @relation("Followers")
+  notificationsReceived Notification[] @relation("NotificationsReceived")
+  notificationsSent     Notification[] @relation("NotificationsSent")
 
   @@index([email])
   @@index([username])
@@ -227,4 +229,29 @@ model Follow {
 
   @@unique([followerId, followingId])
   @@index([followingId])
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
+}
+
+// Gerçek olaylardan (takip/beğeni/yorum) üretilen bildirimler.
+// postImageUrl/commentText, okuma yolunun Post'a bağlanmasını gerektirmemek için
+// oluşturma anında denormalize edilir (modüller arası döngüsel bağımlılığı önler).
+model Notification {
+  id           String           @id @default(cuid())
+  recipientId  String
+  recipient    User             @relation("NotificationsReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId      String
+  actor        User             @relation("NotificationsSent", fields: [actorId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  postId       String?
+  postImageUrl String?
+  commentText  String?
+  read         Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  @@index([recipientId, createdAt])
 }
