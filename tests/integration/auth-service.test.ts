@@ -173,3 +173,51 @@ describe("AuthService — password reset", () => {
     expect(res.user.id).toBe(u.id);
   });
 });
+
+describe("AuthService — updateProfile", () => {
+  it("updates name, username and avatar", async () => {
+    const { service, deps } = setup();
+    const u = await service.register(VALID);
+    const updated = await service.updateProfile(u.id, { name: "Yeni Ad", username: "yeniad", avatarUrl: "https://x/y.png" });
+    expect(updated.name).toBe("Yeni Ad");
+    expect(updated.username).toBe("yeniad");
+    expect(updated.avatarUrl).toBe("https://x/y.png");
+    expect((await deps.users.findByUsername("yeniad"))?.id).toBe(u.id);
+  });
+
+  it("rejects a username already taken by someone else", async () => {
+    const { service } = setup();
+    await service.register(VALID);
+    const other = await service.register({ ...VALID, username: "other", email: "other@aura.social" });
+    await expect(service.updateProfile(other.id, { name: "Xavier", username: "deniz" })).rejects.toMatchObject({ code: "USERNAME_TAKEN" });
+  });
+
+  it("rejects an invalid username", async () => {
+    const { service } = setup();
+    const u = await service.register(VALID);
+    await expect(service.updateProfile(u.id, { name: "Xavier", username: "ab" })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});
+
+describe("AuthService — changePassword", () => {
+  it("changes the password when the current one is correct", async () => {
+    const { service } = setup();
+    const u = await service.register(VALID);
+    await service.changePassword(u.id, VALID.password, "Br4ndNewPass!");
+    await expect(service.login({ email: VALID.email, password: VALID.password })).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+    const res = await service.login({ email: VALID.email, password: "Br4ndNewPass!" });
+    expect(res.user.id).toBe(u.id);
+  });
+
+  it("rejects a wrong current password", async () => {
+    const { service } = setup();
+    const u = await service.register(VALID);
+    await expect(service.changePassword(u.id, "WrongCurrent1!", "Br4ndNewPass!")).rejects.toMatchObject({ code: "INVALID_PASSWORD" });
+  });
+
+  it("rejects a too-short new password", async () => {
+    const { service } = setup();
+    const u = await service.register(VALID);
+    await expect(service.changePassword(u.id, VALID.password, "short")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});

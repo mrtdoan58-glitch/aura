@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { BadgeCheck, UserPlus, UserCheck, Pencil, Share2, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toggleFollowAction } from "@/server/actions/social-actions";
@@ -14,6 +15,20 @@ export function ProfileHeader({ profile }: { profile: ProfileDTO }) {
   const [followerCount, setFollowerCount] = useState(profile.followerCount);
   const [pending, startTransition] = useTransition();
   const showToast = useUIStore((s) => s.showToast);
+  const router = useRouter();
+
+  const shareProfile = async () => {
+    const url = `${location.origin}/profile/${profile.username}`;
+    try {
+      if (navigator.share) await navigator.share({ title: profile.name, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        showToast("Profil bağlantısı kopyalandı");
+      }
+    } catch {
+      /* kullanıcı paylaşımı iptal etti — sessiz geç */
+    }
+  };
 
   const toggleFollow = () => {
     const next = !following;
@@ -56,13 +71,13 @@ export function ProfileHeader({ profile }: { profile: ProfileDTO }) {
       <div className="mb-1 flex gap-2.5">
         {profile.isMe ? (
           <>
-            <Button className="flex-1" onClick={() => showToast("Profil düzenle")}>
+            <Button className="flex-1" onClick={() => router.push("/settings/profile")}>
               <Pencil className="h-[17px] w-[17px]" /> Düzenle
             </Button>
-            <Button variant="ghost" size="icon" className="!h-12 !w-12 !rounded-[16px]" onClick={() => showToast("Paylaş")}>
+            <Button variant="ghost" size="icon" className="!h-12 !w-12 !rounded-[16px]" onClick={shareProfile} aria-label="Profili paylaş">
               <Share2 className="h-[17px] w-[17px]" />
             </Button>
-            <Button variant="ghost" size="icon" className="!h-12 !w-12 !rounded-[16px]" onClick={() => showToast("Ayarlar")}>
+            <Button variant="ghost" size="icon" className="!h-12 !w-12 !rounded-[16px]" onClick={() => router.push("/settings")} aria-label="Ayarlar">
               <Settings className="h-[17px] w-[17px]" />
             </Button>
           </>

@@ -50,6 +50,29 @@ export const resetPasswordSchema = z
 
 export const verifyEmailSchema = z.object({ token: z.string().min(1) });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(2, "İsim en az 2 karakter").max(60, "İsim çok uzun"),
+  username: z
+    .string()
+    .min(3, "Kullanıcı adı en az 3 karakter")
+    .max(24, "Kullanıcı adı çok uzun")
+    .regex(/^[a-z0-9_]+$/i, "Yalnızca harf, rakam ve alt çizgi"),
+});
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Mevcut şifre gerekli"),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Şifreler eşleşmiyor",
+    path: ["confirmPassword"],
+  });
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

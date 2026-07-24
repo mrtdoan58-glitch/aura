@@ -11,7 +11,10 @@ export type AuthErrorCode =
   | "TWO_FACTOR_REQUIRED"
   | "TWO_FACTOR_INVALID"
   | "SESSION_INVALID"
-  | "TOKEN_REUSE_DETECTED";
+  | "TOKEN_REUSE_DETECTED"
+  | "INVALID_INPUT"
+  | "USER_NOT_FOUND"
+  | "INVALID_PASSWORD";
 
 export class AuthError extends Error {
   constructor(

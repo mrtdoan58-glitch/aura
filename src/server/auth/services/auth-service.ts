@@ -233,6 +233,33 @@ export class AuthService {
     return this.deps.users.searchUsers(query, limit);
   }
 
+  /* --------------------------- Profil / şifre ayarları --------------------------- */
+  async updateProfile(
+    userId: string,
+    input: { name: string; username: string; avatarUrl?: string | null }
+  ): Promise<User> {
+    const name = input.name.trim();
+    if (name.length < 2 || name.length > 60) throw new AuthError("INVALID_INPUT", "İsim 2-60 karakter olmalı.");
+    const username = input.username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,24}$/.test(username))
+      throw new AuthError("INVALID_INPUT", "Kullanıcı adı 3-24 karakter; yalnızca harf, rakam ve alt çizgi.");
+    const existing = await this.deps.users.findByUsername(username);
+    if (existing && existing.id !== userId) throw new AuthError("USERNAME_TAKEN", "Bu kullanıcı adı alınmış.");
+    const data: Partial<User> = { name, username };
+    if (input.avatarUrl !== undefined) data.avatarUrl = input.avatarUrl;
+    return this.deps.users.update(userId, data);
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw new AuthError("USER_NOT_FOUND", "Kullanıcı bulunamadı.");
+    const ok = await verifyPassword(currentPassword, user.passwordHash);
+    if (!ok) throw new AuthError("INVALID_PASSWORD", "Mevcut şifre hatalı.");
+    if (newPassword.length < 8) throw new AuthError("INVALID_INPUT", "Yeni şifre en az 8 karakter olmalı.");
+    const passwordHash = await hashPassword(newPassword);
+    await this.deps.users.update(userId, { passwordHash, failedLoginCount: 0, lockedUntil: null });
+  }
+
   /* --------------------------- Çıkış --------------------------- */
   async logout(refreshToken: string): Promise<void> {
     const session = await this.deps.sessions.findByRefreshHash(hashToken(refreshToken));
