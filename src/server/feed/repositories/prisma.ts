@@ -274,8 +274,8 @@ export class PrismaCommentRepository implements CommentRepository {
     const limit = Math.min(Math.max(params.limit, 1), 50);
     const or = cursorOr(params.cursor);
     const rows = await prisma.comment.findMany({
-      where: { postId, deletedAt: null, ...(or ? { OR: or } : {}) },
-      include: { author: true },
+      where: { postId, parentId: null, deletedAt: null, ...(or ? { OR: or } : {}) },
+      include: { author: true, _count: { select: { replies: { where: { deletedAt: null } } } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
     });
@@ -284,31 +284,59 @@ export class PrismaCommentRepository implements CommentRepository {
     const items: Comment[] = page.map((c) => ({
       id: c.id,
       postId: c.postId,
+      parentId: c.parentId,
       author: toAuthor(c.author),
       text: c.text,
       likeCount: c.likeCount,
+      replyCount: c._count.replies,
       createdAt: c.createdAt,
     }));
     const last = items[items.length - 1];
     return { items, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null };
   }
 
-  async add(data: { postId: string; author: Author; text: string }): Promise<Comment> {
+  async listReplies(parentId: string, limit: number): Promise<Comment[]> {
+    const rows = await prisma.comment.findMany({
+      where: { parentId, deletedAt: null },
+      include: { author: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: Math.min(Math.max(limit, 1), 50),
+    });
+    return rows.map((c) => ({
+      id: c.id,
+      postId: c.postId,
+      parentId: c.parentId,
+      author: toAuthor(c.author),
+      text: c.text,
+      likeCount: c.likeCount,
+      replyCount: 0,
+      createdAt: c.createdAt,
+    }));
+  }
+
+  async add(data: { postId: string; author: Author; text: string; parentId?: string | null }): Promise<Comment> {
     const row = await prisma.comment.create({
-      data: { postId: data.postId, authorId: data.author.id, text: data.text },
+      data: { postId: data.postId, authorId: data.author.id, text: data.text, parentId: data.parentId ?? null },
     });
     return {
       id: row.id,
       postId: row.postId,
+      parentId: row.parentId,
       author: data.author,
       text: row.text,
       likeCount: row.likeCount,
+      replyCount: 0,
       createdAt: row.createdAt,
     };
   }
 
   async countByPost(postId: string): Promise<number> {
-    return prisma.comment.count({ where: { postId, deletedAt: null } });
+    return prisma.comment.count({ where: { postId, parentId: null, deletedAt: null } });
+  }
+
+  async postIdOf(commentId: string): Promise<string | null> {
+    const row = await prisma.comment.findUnique({ where: { id: commentId }, select: { postId: true } });
+    return row?.postId ?? null;
   }
 }
 

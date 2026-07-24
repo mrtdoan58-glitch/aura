@@ -45,9 +45,11 @@ export interface PostView extends Post {
 export interface Comment {
   id: string;
   postId: string;
+  parentId: string | null;
   author: Author;
   text: string;
   likeCount: number;
+  replyCount: number;
   createdAt: Date;
 }
 
@@ -121,9 +123,14 @@ export interface SaveRepository {
 }
 
 export interface CommentRepository {
+  /** Yalnızca üst-seviye yorumlar (parentId=null); her biri replyCount ile. */
   listByPost(postId: string, params: CursorParams): Promise<CursorPage<Comment>>;
-  add(data: { postId: string; author: Author; text: string }): Promise<Comment>;
+  /** Bir yorumun yanıtları (eskiden yeniye), en fazla `limit`. */
+  listReplies(parentId: string, limit: number): Promise<Comment[]>;
+  add(data: { postId: string; author: Author; text: string; parentId?: string | null }): Promise<Comment>;
   countByPost(postId: string): Promise<number>;
+  /** Yorumun ait olduğu post id'si (yanıt doğrulaması için); yoksa null. */
+  postIdOf(commentId: string): Promise<string | null>;
 }
 
 export interface StoryRepository {

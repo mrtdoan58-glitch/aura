@@ -32,9 +32,11 @@ export interface PostDTO {
 export interface CommentDTO {
   id: string;
   postId: string;
+  parentId: string | null;
   author: AuthorDTO;
   text: string;
   likeCount: number;
+  replyCount: number;
   createdAt: string;
 }
 export interface StoryDTO {

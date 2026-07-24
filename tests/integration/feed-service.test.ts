@@ -202,6 +202,36 @@ describe("FeedService — comments", () => {
     await expect(service.addComment(p.id, AUTHOR, "   ")).rejects.toMatchObject({ code: "INVALID_INPUT" });
     await expect(service.addComment(p.id, AUTHOR, "x".repeat(1001))).rejects.toMatchObject({ code: "INVALID_INPUT" });
   });
+
+  it("threads replies under a parent; only top-level bumps the post counter", async () => {
+    const { service } = setup(1);
+    const p = (await service.getFeed({ limit: 1 }, VIEWER)).items[0];
+    const before = p.commentCount;
+    const top = await service.addComment(p.id, AUTHOR, "üst yorum");
+    const reply = await service.addComment(p.id, AUTHOR, "bir yanıt", top.id);
+    expect(reply.parentId).toBe(top.id);
+
+    // Liste yalnızca üst-seviyeyi döner, replyCount ile
+    const list = await service.listComments(p.id, { limit: 10 });
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0].id).toBe(top.id);
+    expect(list.items[0].replyCount).toBe(1);
+
+    // Yanıtlar ayrı listelenir
+    const replies = await service.listReplies(top.id);
+    expect(replies.map((r) => r.id)).toEqual([reply.id]);
+
+    // Post yorum sayacı yalnızca üst-seviye için arttı (+1, yanıt için değil)
+    const fresh = await service.getPost(p.id, VIEWER);
+    expect(fresh.commentCount).toBe(before + 1);
+  });
+
+  it("rejects a reply whose parent belongs to another post", async () => {
+    const { service } = setup(2);
+    const feed = (await service.getFeed({ limit: 2 }, VIEWER)).items;
+    const parent = await service.addComment(feed[0].id, AUTHOR, "başka gönderide");
+    await expect(service.addComment(feed[1].id, AUTHOR, "kaçak yanıt", parent.id)).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
 });
 
 describe("FeedService — stories", () => {

@@ -151,23 +151,39 @@ export class InMemorySaveRepository extends RelationRepo implements SaveReposito
 
 export class InMemoryCommentRepository implements CommentRepository {
   private comments: Comment[] = [];
-  async listByPost(postId: string, params: CursorParams) {
-    return paginate(this.comments.filter((c) => c.postId === postId), params);
+  private replyCount(id: string) {
+    return this.comments.filter((c) => c.parentId === id).length;
   }
-  async add(data: { postId: string; author: Author; text: string }): Promise<Comment> {
+  async listByPost(postId: string, params: CursorParams) {
+    const top = this.comments.filter((c) => c.postId === postId && c.parentId === null);
+    const page = paginate(top, params);
+    return { ...page, items: page.items.map((c) => ({ ...c, replyCount: this.replyCount(c.id) })) };
+  }
+  async listReplies(parentId: string, limit: number): Promise<Comment[]> {
+    return this.comments
+      .filter((c) => c.parentId === parentId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, Math.max(1, limit));
+  }
+  async add(data: { postId: string; author: Author; text: string; parentId?: string | null }): Promise<Comment> {
     const comment: Comment = {
       id: randomUUID(),
       postId: data.postId,
+      parentId: data.parentId ?? null,
       author: data.author,
       text: data.text,
       likeCount: 0,
+      replyCount: 0,
       createdAt: new Date(),
     };
     this.comments.push(comment);
     return comment;
   }
   async countByPost(postId: string) {
-    return this.comments.filter((c) => c.postId === postId).length;
+    return this.comments.filter((c) => c.postId === postId && c.parentId === null).length;
+  }
+  async postIdOf(commentId: string): Promise<string | null> {
+    return this.comments.find((c) => c.id === commentId)?.postId ?? null;
   }
 }
 

@@ -83,18 +83,21 @@ export async function toggleSaveAction(postId: string, saved: boolean): Promise<
   }
 }
 
-export async function addCommentAction(postId: string, text: string): Promise<ActionResult<CommentDTO>> {
+export async function addCommentAction(postId: string, text: string, parentId?: string | null): Promise<ActionResult<CommentDTO>> {
   const author = await requireAuthor();
   if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
   try {
-    const comment = await getFeedService().addComment(postId, author, text);
-    try {
-      const post = await getFeedService().getPost(postId, null);
-      if (post.author.id !== author.id) {
-        await notify({ recipientId: post.author.id, actor: author, type: "COMMENT", postId, postImageUrl: post.media[0]?.url ?? null, commentText: text.slice(0, 140) });
+    const comment = await getFeedService().addComment(postId, author, text, parentId);
+    // Bildirim yalnızca üst-seviye yorumda gönderi sahibine (yanıtlarda değil).
+    if (!parentId) {
+      try {
+        const post = await getFeedService().getPost(postId, null);
+        if (post.author.id !== author.id) {
+          await notify({ recipientId: post.author.id, actor: author, type: "COMMENT", postId, postImageUrl: post.media[0]?.url ?? null, commentText: text.slice(0, 140) });
+        }
+      } catch {
+        /* bildirim best-effort */
       }
-    } catch {
-      /* bildirim best-effort */
     }
     return { ok: true, data: toDTO(comment) };
   } catch (e) {

@@ -155,7 +155,12 @@ export class FeedService {
     return this.deps.comments.listByPost(postId, { cursor: params.cursor, limit: clampLimit(params.limit) });
   }
 
-  async addComment(postId: string, author: Author, text: string): Promise<Comment> {
+  /** Bir yorumun yanıtları (eskiden yeniye). */
+  async listReplies(parentId: string, limit = 20): Promise<Comment[]> {
+    return this.deps.comments.listReplies(parentId, limit);
+  }
+
+  async addComment(postId: string, author: Author, text: string, parentId?: string | null): Promise<Comment> {
     const trimmed = text.trim();
     if (!trimmed) throw new FeedError("INVALID_INPUT", "Yorum boş olamaz.");
     if (trimmed.length > MAX_COMMENT_LEN) throw new FeedError("INVALID_INPUT", "Yorum çok uzun.");
@@ -165,8 +170,14 @@ export class FeedService {
     }
     const post = await this.deps.posts.findById(postId);
     if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");
-    const comment = await this.deps.comments.add({ postId, author, text: trimmed });
-    await this.deps.posts.incrementCommentCount(postId, 1);
+    if (parentId) {
+      // Yanıt: üst yorum aynı gönderiye ait olmalı (yalnızca tek seviye yanıt).
+      const parentPost = await this.deps.comments.postIdOf(parentId);
+      if (parentPost !== postId) throw new FeedError("INVALID_INPUT", "Geçersiz yanıt hedefi.");
+    }
+    const comment = await this.deps.comments.add({ postId, author, text: trimmed, parentId: parentId ?? null });
+    // Yalnızca üst-seviye yorumlar gönderi yorum sayacını artırır (yanıtlar değil).
+    if (!parentId) await this.deps.posts.incrementCommentCount(postId, 1);
     return comment;
   }
 
