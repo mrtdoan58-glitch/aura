@@ -17,10 +17,10 @@ export async function GET(req: NextRequest) {
   if (!user) {
     const key = `rc:explore:${cursor ?? "0"}:${limit}`;
     const hit = await getCached<CursorPageDTO<PostDTO>>(key);
-    if (hit) return NextResponse.json(hit);
+    if (hit) return NextResponse.json(hit, { headers: { "x-cache": "HIT" } });
     const page = await getFeedService().getExplore({ cursor, limit }, null);
     await setCached(key, page, ANON_TTL);
-    return NextResponse.json(page);
+    return NextResponse.json(page, { headers: { "x-cache": "MISS" } });
   }
 
   const page = await getFeedService().getExplore({ cursor, limit }, user.id);
