@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { getAuthService } from "@/server/auth/container";
 import { AuthError } from "@/server/auth/errors";
 import { getCurrentUser } from "@/server/auth/current-user";
-import { getSessionToken } from "@/server/auth/cookies";
+import { getSessionToken, clearSessionCookie } from "@/server/auth/cookies";
 import { updateProfileSchema, changePasswordSchema } from "@/lib/validation/auth";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
@@ -98,6 +98,19 @@ export async function changePasswordAction(
     const token = await getSessionToken();
     const current = token ? await getAuthService().getValidSessionByToken(token) : null;
     await getAuthService().revokeOtherSessions(user.id, current?.id ?? "");
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteAccountAction(password: string): Promise<ActionResult<null>> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  if (!password) return { ok: false, error: "Şifre gerekli.", code: "INVALID_INPUT" };
+  try {
+    await getAuthService().deleteAccount(user.id, password);
+    await clearSessionCookie(); // oturum çerezini temizle (DB oturumları cascade ile zaten gitti)
     return { ok: true, data: null };
   } catch (e) {
     return fail(e);

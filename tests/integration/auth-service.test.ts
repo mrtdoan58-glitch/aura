@@ -221,3 +221,20 @@ describe("AuthService — changePassword", () => {
     await expect(service.changePassword(u.id, VALID.password, "short")).rejects.toMatchObject({ code: "INVALID_INPUT" });
   });
 });
+
+describe("AuthService — deleteAccount", () => {
+  it("deletes the account after password check; login then fails", async () => {
+    const { service, deps } = setup();
+    const u = await service.register(VALID);
+    await service.deleteAccount(u.id, VALID.password);
+    expect(await deps.users.findById(u.id)).toBeNull();
+    await expect(service.login({ email: VALID.email, password: VALID.password })).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+  });
+
+  it("rejects deletion with a wrong password", async () => {
+    const { service, deps } = setup();
+    const u = await service.register(VALID);
+    await expect(service.deleteAccount(u.id, "WrongPass1!")).rejects.toMatchObject({ code: "INVALID_PASSWORD" });
+    expect(await deps.users.findById(u.id)).not.toBeNull();
+  });
+});

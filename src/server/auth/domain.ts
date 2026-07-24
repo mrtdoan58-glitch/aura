@@ -65,6 +65,8 @@ export interface UserRepository {
   searchUsers(query: string, limit: number): Promise<User[]>;
   create(data: NewUser): Promise<User>;
   update(id: string, data: Partial<User>): Promise<User>;
+  /** Kullanıcıyı siler; ilişkili tüm veri FK cascade ile temizlenir. */
+  delete(id: string): Promise<void>;
 }
 
 export interface NewUser {

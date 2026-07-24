@@ -46,6 +46,9 @@ export class PrismaUserRepository implements UserRepository {
   update(id: string, data: Partial<User>): Promise<User> {
     return prisma.user.update({ where: { id }, data }) as Promise<User>;
   }
+  async delete(id: string): Promise<void> {
+    await prisma.user.delete({ where: { id } });
+  }
 }
 
 export class PrismaSessionRepository implements SessionRepository {

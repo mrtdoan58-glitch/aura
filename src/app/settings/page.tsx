@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User, Lock, ShieldCheck, ChevronRight } from "lucide-react";
+import { ArrowLeft, User, Lock, ShieldCheck, ChevronRight, Trash2 } from "lucide-react";
 import { getCurrentUser } from "@/server/auth/current-user";
 import { Avatar } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -47,6 +47,15 @@ export default async function SettingsPage() {
       <div className="mt-6">
         <LogoutButton />
       </div>
+
+      <Link
+        href="/settings/delete"
+        className="mt-3 flex items-center gap-3.5 rounded-2xl px-4 py-3 text-danger transition-colors hover:bg-danger/5"
+      >
+        <Trash2 className="h-[18px] w-[18px]" />
+        <span className="flex-1 text-[14px] font-semibold">Hesabı Sil</span>
+        <ChevronRight className="h-5 w-5 opacity-60" />
+      </Link>
     </div>
   );
 }

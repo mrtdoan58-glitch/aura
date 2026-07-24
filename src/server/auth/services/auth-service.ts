@@ -260,6 +260,15 @@ export class AuthService {
     await this.deps.users.update(userId, { passwordHash, failedLoginCount: 0, lockedUntil: null });
   }
 
+  /** Hesabı kalıcı olarak siler (şifre doğrulaması sonrası; ilişkili veri FK cascade ile gider). */
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw new AuthError("USER_NOT_FOUND", "Kullanıcı bulunamadı.");
+    const ok = await verifyPassword(password, user.passwordHash);
+    if (!ok) throw new AuthError("INVALID_PASSWORD", "Şifre hatalı.");
+    await this.deps.users.delete(userId);
+  }
+
   /* --------------------------- Çıkış --------------------------- */
   async logout(refreshToken: string): Promise<void> {
     const session = await this.deps.sessions.findByRefreshHash(hashToken(refreshToken));
