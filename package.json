@@ -61,7 +61,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.2.11",
-    "prettier": "^3.4.2",
+    "prettier": "^3.9.6",
     "prisma": "^7.9.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.2",
