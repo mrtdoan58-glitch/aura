@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/server/auth/current-user";
 import { AppShell } from "@/components/layout/app-shell";
-import { SavedPostsGrid } from "@/components/feed/saved-posts-grid";
+import { SavedCollections } from "@/components/feed/saved-collections";
 
 export const metadata: Metadata = { title: "Kaydedilenler — Aura" };
 
@@ -21,7 +21,7 @@ export default async function SavedPage() {
           </Link>
           <h1 className="text-[19px] font-extrabold tracking-tight">Kaydedilenler</h1>
         </header>
-        <SavedPostsGrid />
+        <SavedCollections />
       </div>
     </AppShell>
   );

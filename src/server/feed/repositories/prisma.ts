@@ -8,6 +8,7 @@ import { decodeCursor, encodeCursor } from "@/server/feed/cursor";
 import type {
   Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
+  Collection, CollectionRepository,
 } from "@/server/feed/domain";
 import type { Prisma, User } from "@/generated/prisma/client";
 
@@ -244,7 +245,7 @@ export class PrismaSaveRepository implements SaveRepository {
     });
     return new Set(rows.map((r) => r.postId));
   }
-  async listSaved(userId: string, params: CursorParams): Promise<CursorPage<Post>> {
+  async listSaved(userId: string, params: CursorParams, collectionId?: string): Promise<CursorPage<Post>> {
     const limit = Math.min(Math.max(params.limit, 1), 50);
     const decoded = decodeCursor(params.cursor);
     const postWhere: Prisma.PostWhereInput | undefined = decoded
@@ -256,7 +257,7 @@ export class PrismaSaveRepository implements SaveRepository {
         }
       : undefined;
     const rows = await prisma.savedPost.findMany({
-      where: { userId, post: { deletedAt: null, ...postWhere } },
+      where: { userId, ...(collectionId ? { collectionId } : {}), post: { deletedAt: null, ...postWhere } },
       include: { post: { include: { author: true, media: true } } },
       orderBy: [{ post: { createdAt: "desc" } }, { post: { id: "desc" } }],
       take: limit + 1,
@@ -266,6 +267,64 @@ export class PrismaSaveRepository implements SaveRepository {
     const items = page.map((r) => toPost(r.post));
     const last = items[items.length - 1];
     return { items, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null };
+  }
+
+  async setCollection(userId: string, postId: string, collectionId: string | null): Promise<boolean> {
+    const res = await prisma.savedPost.updateMany({ where: { userId, postId }, data: { collectionId } });
+    return res.count > 0;
+  }
+
+  async collectionOf(userId: string, postId: string): Promise<string | null> {
+    const row = await prisma.savedPost.findUnique({
+      where: { userId_postId: { userId, postId } },
+      select: { collectionId: true },
+    });
+    return row?.collectionId ?? null;
+  }
+}
+
+export class PrismaCollectionRepository implements CollectionRepository {
+  async create(userId: string, name: string): Promise<Collection | null> {
+    try {
+      const c = await prisma.collection.create({ data: { userId, name } });
+      return { id: c.id, name: c.name, postCount: 0, coverUrl: null, createdAt: c.createdAt };
+    } catch (e) {
+      if (isUniqueConstraintError(e)) return null; // aynı isim
+      throw e;
+    }
+  }
+
+  async listForUser(userId: string): Promise<Collection[]> {
+    const rows = await prisma.collection.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { savedPosts: true } },
+        // kapak: en yeni kaydın ilk medyası
+        savedPosts: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: { post: { include: { media: { orderBy: { order: "asc" }, take: 1 } } } },
+        },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      postCount: r._count.savedPosts,
+      coverUrl: r.savedPosts[0]?.post.media[0]?.url ?? null,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  async delete(userId: string, collectionId: string): Promise<void> {
+    // FK ON DELETE SET NULL → içindeki kayıtlar silinmez, koleksiyonsuz kalır.
+    await prisma.collection.deleteMany({ where: { id: collectionId, userId } });
+  }
+
+  async ownedBy(collectionId: string, userId: string): Promise<boolean> {
+    const row = await prisma.collection.findFirst({ where: { id: collectionId, userId }, select: { id: true } });
+    return row !== null;
   }
 }
 

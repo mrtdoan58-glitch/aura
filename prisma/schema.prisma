@@ -49,6 +49,7 @@ model User {
   sentMessages          Message[]                 @relation("UserMessages")
   commentLikes          CommentLike[]             @relation("UserCommentLikes")
   messageReactions      MessageReaction[]         @relation("UserMessageReactions")
+  collections           Collection[]              @relation("UserCollections")
 
   @@index([email])
   @@index([username])
@@ -205,9 +206,27 @@ model SavedPost {
   user      User     @relation("UserSaves", fields: [userId], references: [id], onDelete: Cascade)
   postId    String
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // Opsiyonel koleksiyon; koleksiyon silinince kayıt "Tümü"de kalır (SetNull).
+  collectionId String?
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@unique([userId, postId])
+  @@index([userId, createdAt])
+  @@index([collectionId])
+}
+
+// Kullanıcının kaydedilenlerini gruplayan isimli koleksiyonlar.
+model Collection {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserCollections", fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  savedPosts SavedPost[]
+
+  @@unique([userId, name])
   @@index([userId, createdAt])
 }
 

@@ -5,6 +5,7 @@
  */
 import type {
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
+  CollectionRepository, Collection,
   CursorPage, PostView, Post, Comment, Story, Author, NewPostMedia, MediaType,
 } from "@/server/feed/domain";
 import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
@@ -24,6 +25,7 @@ export interface FeedDeps {
   saves: SaveRepository;
   comments: CommentRepository;
   commentLikes: CommentLikeRepository;
+  collections: CollectionRepository;
   stories: StoryRepository;
   commentRateLimiter?: RateLimiter;
   postRateLimiter?: RateLimiter;
@@ -156,12 +158,57 @@ export class FeedService {
   }
 
   async getSaved(
-    params: { cursor?: string | null; limit?: number },
+    params: { cursor?: string | null; limit?: number; collectionId?: string },
     viewerId: string
   ): Promise<CursorPage<PostView>> {
     if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
-    const page = await this.deps.saves.listSaved(viewerId, { cursor: params.cursor, limit: clampLimit(params.limit) });
+    if (params.collectionId && !(await this.deps.collections.ownedBy(params.collectionId, viewerId))) {
+      throw new FeedError("NOT_FOUND", "Koleksiyon bulunamadı.");
+    }
+    const page = await this.deps.saves.listSaved(
+      viewerId,
+      { cursor: params.cursor, limit: clampLimit(params.limit) },
+      params.collectionId
+    );
     return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
+  }
+
+  /* --------------------------- Koleksiyonlar --------------------------- */
+  async listCollections(viewerId: string): Promise<Collection[]> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    return this.deps.collections.listForUser(viewerId);
+  }
+
+  async createCollection(viewerId: string, name: string): Promise<Collection> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    const trimmed = name.trim();
+    if (!trimmed) throw new FeedError("INVALID_INPUT", "Koleksiyon adı boş olamaz.");
+    if (trimmed.length > 40) throw new FeedError("INVALID_INPUT", "Koleksiyon adı çok uzun.");
+    const created = await this.deps.collections.create(viewerId, trimmed);
+    if (!created) throw new FeedError("INVALID_INPUT", "Bu isimde bir koleksiyon zaten var.");
+    return created;
+  }
+
+  async deleteCollection(viewerId: string, collectionId: string): Promise<void> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    if (!(await this.deps.collections.ownedBy(collectionId, viewerId)))
+      throw new FeedError("NOT_FOUND", "Koleksiyon bulunamadı.");
+    await this.deps.collections.delete(viewerId, collectionId);
+  }
+
+  /** Kaydedilmiş bir gönderiyi koleksiyona taşı (null = koleksiyondan çıkar). */
+  async setPostCollection(viewerId: string, postId: string, collectionId: string | null): Promise<void> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    if (collectionId && !(await this.deps.collections.ownedBy(collectionId, viewerId)))
+      throw new FeedError("NOT_FOUND", "Koleksiyon bulunamadı.");
+    const ok = await this.deps.saves.setCollection(viewerId, postId, collectionId);
+    if (!ok) throw new FeedError("INVALID_INPUT", "Önce gönderiyi kaydetmelisin.");
+  }
+
+  /** Bir gönderinin (viewer için) hangi koleksiyonda olduğu. */
+  async getPostCollection(viewerId: string, postId: string): Promise<string | null> {
+    if (!viewerId) return null;
+    return this.deps.saves.collectionOf(viewerId, postId);
   }
 
   /* --------------------------- Beğeni --------------------------- */

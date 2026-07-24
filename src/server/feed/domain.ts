@@ -127,7 +127,30 @@ export interface SaveRepository {
   add(userId: string, postId: string): Promise<boolean>;
   remove(userId: string, postId: string): Promise<boolean>;
   filterSaved(userId: string, postIds: string[]): Promise<Set<string>>;
-  listSaved(userId: string, params: CursorParams): Promise<CursorPage<Post>>;
+  /** `collectionId` verilirse yalnızca o koleksiyondaki kayıtlar. */
+  listSaved(userId: string, params: CursorParams, collectionId?: string): Promise<CursorPage<Post>>;
+  /** Kaydı bir koleksiyona taşı (null = koleksiyondan çıkar). Kayıt yoksa false. */
+  setCollection(userId: string, postId: string, collectionId: string | null): Promise<boolean>;
+  /** Kaydın hangi koleksiyonda olduğu (yoksa/koleksiyonsuzsa null). */
+  collectionOf(userId: string, postId: string): Promise<string | null>;
+}
+
+/** Kaydedilenleri gruplayan isimli koleksiyon (kapak = en yeni kaydın ilk medyası). */
+export interface Collection {
+  id: string;
+  name: string;
+  postCount: number;
+  coverUrl: string | null;
+  createdAt: Date;
+}
+
+export interface CollectionRepository {
+  /** Aynı isimde koleksiyon varsa null döner (hata tipi sızdırmadan). */
+  create(userId: string, name: string): Promise<Collection | null>;
+  listForUser(userId: string): Promise<Collection[]>;
+  /** Koleksiyonu siler; içindeki kayıtlar silinmez (collectionId NULL olur). */
+  delete(userId: string, collectionId: string): Promise<void>;
+  ownedBy(collectionId: string, userId: string): Promise<boolean>;
 }
 
 export interface CommentRepository {

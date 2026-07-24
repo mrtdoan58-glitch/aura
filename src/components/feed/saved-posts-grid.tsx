@@ -8,8 +8,8 @@ import { useSaved } from "@/hooks/use-saved";
 import { useIntersection } from "@/hooks/use-intersection";
 import { EmptyState, ErrorState } from "@/components/feed/states";
 
-export function SavedPostsGrid() {
-  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useSaved();
+export function SavedPostsGrid({ collectionId }: { collectionId?: string }) {
+  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useSaved(collectionId);
 
   const onIntersect = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
@@ -28,7 +28,7 @@ export function SavedPostsGrid() {
   if (posts.length === 0)
     return (
       <div className="px-4 py-10">
-        <EmptyState title="Henüz kaydedilen yok" hint="Bir gönderideki yer imi simgesine dokunarak burada saklayabilirsin." />
+        <EmptyState title={collectionId ? "Bu koleksiyon boş" : "Henüz kaydedilen yok"} hint={collectionId ? "Bir gönderiyi bu koleksiyona ekleyebilirsin." : "Bir gönderideki yer imi simgesine dokunarak burada saklayabilirsin."} />
       </div>
     );
 

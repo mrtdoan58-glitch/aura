@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PostCard } from "@/components/feed/post-card";
 import { PostDetailHeader } from "@/components/feed/post-detail-header";
 import { InlineComments } from "@/components/feed/inline-comments";
+import { CollectionPicker } from "@/components/feed/collection-picker";
 import { getFeedService } from "@/server/feed/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { PostView } from "@/server/feed/domain";
@@ -54,11 +55,19 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
     throw e;
   }
 
+  // Kaydedilmişse koleksiyon seçicisini göster (mevcut koleksiyonu ile).
+  const currentCollectionId = viewer && post.savedByMe
+    ? await getFeedService().getPostCollection(viewer.id, post.id)
+    : null;
+
   return (
     <AppShell>
       <div className="mx-auto max-w-[500px]">
         <PostDetailHeader />
         <PostCard post={toPostDTO(post)} priority />
+        {viewer && post.savedByMe && (
+          <CollectionPicker postId={post.id} initialCollectionId={currentCollectionId} />
+        )}
         <InlineComments postId={post.id} canComment={!!viewer} />
       </div>
     </AppShell>

@@ -48,6 +48,13 @@ export interface StoryDTO {
   expiresAt: string;
   seenByMe: boolean;
 }
+export interface CollectionDTO {
+  id: string;
+  name: string;
+  postCount: number;
+  coverUrl: string | null;
+  createdAt: string;
+}
 export interface CursorPageDTO<T> {
   items: T[];
   nextCursor: string | null;

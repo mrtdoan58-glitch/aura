@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import type {
   Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
+  Collection, CollectionRepository,
 } from "@/server/feed/domain";
 import { encodeCursor, decodeCursor, isAfterCursor } from "@/server/feed/cursor";
 import { seedPosts, seedStories } from "@/server/feed/seed";
@@ -126,15 +127,45 @@ export class InMemoryLikeRepository extends RelationRepo implements LikeReposito
 }
 
 export class InMemorySaveRepository extends RelationRepo implements SaveRepository {
+  /** `${userId}:${postId}` → collectionId */
+  private inCollection = new Map<string, string>();
+
   constructor(private readonly postRepo: InMemoryPostRepository) {
     super();
   }
   async filterSaved(userId: string, postIds: string[]) {
     return this.filter(userId, postIds);
   }
-  async listSaved(userId: string, params: CursorParams): Promise<CursorPage<Post>> {
+  async setCollection(userId: string, postId: string, collectionId: string | null): Promise<boolean> {
+    const k = this.key(userId, postId);
+    if (!this.set.has(k)) return false; // yalnızca kaydedilmiş gönderi bir koleksiyona konabilir
+    if (collectionId === null) this.inCollection.delete(k);
+    else this.inCollection.set(k, collectionId);
+    return true;
+  }
+  async collectionOf(userId: string, postId: string): Promise<string | null> {
+    return this.inCollection.get(this.key(userId, postId)) ?? null;
+  }
+  /** Bir koleksiyonun kayıt sayısı + kapak görseli (en yeni kayıt). */
+  collectionStats(userId: string, collectionId: string): { count: number; coverUrl: string | null } {
+    const ids = [...this.inCollection.entries()]
+      .filter(([k, c]) => c === collectionId && k.startsWith(`${userId}:`))
+      .map(([k]) => k.split(":")[1]);
+    const posts = this.postRepo.all()
+      .filter((p) => ids.includes(p.id))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return { count: ids.length, coverUrl: posts[0]?.media[0]?.url ?? null };
+  }
+  /** Koleksiyon silindiğinde kayıtları koleksiyonsuz bırak (SetNull karşılığı). */
+  detachCollection(collectionId: string): void {
+    for (const [k, c] of this.inCollection.entries()) if (c === collectionId) this.inCollection.delete(k);
+  }
+  async listSaved(userId: string, params: CursorParams, collectionId?: string): Promise<CursorPage<Post>> {
     const savedIds = new Set(
-      [...this.set].filter((k) => k.startsWith(`${userId}:`)).map((k) => k.split(":")[1])
+      [...this.set]
+        .filter((k) => k.startsWith(`${userId}:`))
+        .filter((k) => (collectionId ? this.inCollection.get(k) === collectionId : true))
+        .map((k) => k.split(":")[1])
     );
     const posts = this.postRepo.all().filter((p) => savedIds.has(p.id));
     // paginate is generic in module scope; reuse local sort
@@ -146,6 +177,34 @@ export class InMemorySaveRepository extends RelationRepo implements SaveReposito
     const last = items[items.length - 1];
     const hasMore = start.length > items.length;
     return { items, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null };
+  }
+}
+
+export class InMemoryCollectionRepository implements CollectionRepository {
+  private rows: { id: string; userId: string; name: string; createdAt: Date }[] = [];
+  constructor(private readonly saves: InMemorySaveRepository) {}
+
+  async create(userId: string, name: string): Promise<Collection | null> {
+    if (this.rows.some((r) => r.userId === userId && r.name === name)) return null;
+    const row = { id: randomUUID(), userId, name, createdAt: new Date() };
+    this.rows.push(row);
+    return { id: row.id, name: row.name, postCount: 0, coverUrl: null, createdAt: row.createdAt };
+  }
+  async listForUser(userId: string): Promise<Collection[]> {
+    return this.rows
+      .filter((r) => r.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((r) => {
+        const s = this.saves.collectionStats(userId, r.id);
+        return { id: r.id, name: r.name, postCount: s.count, coverUrl: s.coverUrl, createdAt: r.createdAt };
+      });
+  }
+  async delete(userId: string, collectionId: string): Promise<void> {
+    this.rows = this.rows.filter((r) => !(r.id === collectionId && r.userId === userId));
+    this.saves.detachCollection(collectionId);
+  }
+  async ownedBy(collectionId: string, userId: string): Promise<boolean> {
+    return this.rows.some((r) => r.id === collectionId && r.userId === userId);
   }
 }
 

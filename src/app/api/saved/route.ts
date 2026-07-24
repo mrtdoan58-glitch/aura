@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ items: [], nextCursor: null });
   const cursor = req.nextUrl.searchParams.get("cursor");
   const limit = Number(req.nextUrl.searchParams.get("limit") ?? 12);
-  const page = await getFeedService().getSaved({ cursor, limit }, user.id);
+  const collectionId = req.nextUrl.searchParams.get("collection") ?? undefined;
+  const page = await getFeedService().getSaved({ cursor, limit, collectionId }, user.id);
   return NextResponse.json(page);
 }

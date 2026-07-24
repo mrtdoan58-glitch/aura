@@ -10,7 +10,7 @@ import { getFeedService, FeedError } from "@/server/feed/container-actions";
 import { notify } from "@/server/notifications/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { Comment, Post, Story, NewPostMedia } from "@/server/feed/domain";
-import type { CommentDTO, PostDTO, StoryDTO } from "@/lib/feed/types";
+import type { CommentDTO, PostDTO, StoryDTO, CollectionDTO } from "@/lib/feed/types";
 
 function toDTO(c: Comment): CommentDTO {
   return { ...c, createdAt: c.createdAt.toISOString() };
@@ -77,6 +77,44 @@ export async function toggleSaveAction(postId: string, saved: boolean): Promise<
   try {
     const res = await getFeedService().setSave(postId, author.id, saved);
     return { ok: true, data: res };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
+/* --------------------------- Koleksiyonlar --------------------------- */
+export async function createCollectionAction(name: string): Promise<ActionResult<CollectionDTO>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    const c = await getFeedService().createCollection(author.id, name);
+    return { ok: true, data: { ...c, createdAt: c.createdAt.toISOString() } };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
+export async function deleteCollectionAction(collectionId: string): Promise<ActionResult<null>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    await getFeedService().deleteCollection(author.id, collectionId);
+    return { ok: true, data: null };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
+/** Kaydedilmiş gönderiyi koleksiyona taşı (null = koleksiyondan çıkar). */
+export async function setPostCollectionAction(postId: string, collectionId: string | null): Promise<ActionResult<null>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    await getFeedService().setPostCollection(author.id, postId, collectionId);
+    return { ok: true, data: null };
   } catch (e) {
     if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
     return { ok: false, error: "Beklenmeyen bir hata oluştu." };

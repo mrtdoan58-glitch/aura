@@ -3,7 +3,7 @@ import { FeedService } from "@/server/feed/services/feed-service";
 import { seedPosts } from "@/server/feed/seed";
 import {
   InMemoryPostRepository, InMemoryLikeRepository, InMemorySaveRepository,
-  InMemoryCommentRepository, InMemoryStoryRepository, InMemoryCommentLikeRepository,
+  InMemoryCommentRepository, InMemoryStoryRepository, InMemoryCommentLikeRepository, InMemoryCollectionRepository,
 } from "@/server/feed/repositories/in-memory";
 import type { Author } from "@/server/feed/domain";
 
@@ -12,12 +12,14 @@ const AUTHOR: Author = { id: "me", name: "Ben", username: "ben", avatarUrl: "a",
 
 function setup(postCount = 24) {
   const posts = new InMemoryPostRepository(seedPosts(postCount));
+  const saves = new InMemorySaveRepository(posts);
   const deps = {
     posts,
     likes: new InMemoryLikeRepository(),
-    saves: new InMemorySaveRepository(posts),
+    saves,
     comments: new InMemoryCommentRepository(),
     commentLikes: new InMemoryCommentLikeRepository(),
+    collections: new InMemoryCollectionRepository(saves),
     stories: new InMemoryStoryRepository(),
   };
   return { service: new FeedService(deps), deps };
@@ -64,13 +66,15 @@ describe("FeedService — read cache (shared base list, per-viewer enrichment)",
       set: async (k: string, v: unknown) => { store.set(k, JSON.parse(JSON.stringify(v))); },
     };
     const posts = new InMemoryPostRepository(seedPosts(5));
+    const saves = new InMemorySaveRepository(posts);
     const spy = vi.spyOn(posts, "listFeed");
     const service = new FeedService({
       posts,
       likes: new InMemoryLikeRepository(),
-      saves: new InMemorySaveRepository(posts),
+      saves,
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
+      collections: new InMemoryCollectionRepository(saves),
       stories: new InMemoryStoryRepository(),
       readCache: cache,
     });
@@ -85,6 +89,54 @@ describe("FeedService — read cache (shared base list, per-viewer enrichment)",
     expect(bobView.likedByMe).toBe(false); // paylaşılan temel liste ama kişisel enrich → sızıntı yok
     expect(aliceView.createdAt instanceof Date).toBe(true); // revive çalıştı
     expect(spy).toHaveBeenCalledTimes(1); // temel liste DB'den yalnızca bir kez çekildi
+  });
+});
+
+describe("FeedService — collections", () => {
+  it("filters saved posts by collection and keeps 'all' complete", async () => {
+    const { service } = setup(4);
+    const feed = (await service.getFeed({ limit: 4 }, VIEWER)).items;
+    await service.setSave(feed[0].id, VIEWER, true);
+    await service.setSave(feed[1].id, VIEWER, true);
+
+    const col = await service.createCollection(VIEWER, "Seyahat");
+    await service.setPostCollection(VIEWER, feed[0].id, col.id);
+
+    const all = await service.getSaved({ limit: 10 }, VIEWER);
+    const inCol = await service.getSaved({ limit: 10, collectionId: col.id }, VIEWER);
+    expect(all.items.map((p) => p.id).sort()).toEqual([feed[0].id, feed[1].id].sort());
+    expect(inCol.items.map((p) => p.id)).toEqual([feed[0].id]);
+
+    const list = await service.listCollections(VIEWER);
+    expect(list).toHaveLength(1);
+    expect(list[0].postCount).toBe(1);
+    expect(list[0].coverUrl).toBe(feed[0].media[0].url);
+  });
+
+  it("rejects duplicate names, empty names and foreign collections", async () => {
+    const { service } = setup(2);
+    const col = await service.createCollection(VIEWER, "Sanat");
+    await expect(service.createCollection(VIEWER, "Sanat")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    await expect(service.createCollection(VIEWER, "   ")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    // başka kullanıcının koleksiyonu görünmez/kullanılamaz
+    await expect(service.getSaved({ limit: 5, collectionId: col.id }, "someone-else")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(service.deleteCollection("someone-else", col.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("requires the post to be saved before assigning, and deleting a collection keeps the saves", async () => {
+    const { service } = setup(2);
+    const post = (await service.getFeed({ limit: 1 }, VIEWER)).items[0];
+    const col = await service.createCollection(VIEWER, "Mimari");
+    await expect(service.setPostCollection(VIEWER, post.id, col.id)).rejects.toMatchObject({ code: "INVALID_INPUT" });
+
+    await service.setSave(post.id, VIEWER, true);
+    await service.setPostCollection(VIEWER, post.id, col.id);
+    expect(await service.getPostCollection(VIEWER, post.id)).toBe(col.id);
+
+    await service.deleteCollection(VIEWER, col.id);
+    const all = await service.getSaved({ limit: 10 }, VIEWER);
+    expect(all.items.map((p) => p.id)).toContain(post.id); // kayıt duruyor
+    expect(await service.getPostCollection(VIEWER, post.id)).toBeNull(); // koleksiyonsuz
   });
 });
 
@@ -324,13 +376,15 @@ describe("FeedService — stories", () => {
 
   it("rate-limits story spam beyond the limit", async () => {
     const posts = new InMemoryPostRepository(seedPosts(1));
+    const saves = new InMemorySaveRepository(posts);
     const { InMemoryRateLimiter } = await import("@/server/rate-limit/rate-limiter");
     const deps = {
       posts,
       likes: new InMemoryLikeRepository(),
-      saves: new InMemorySaveRepository(posts),
+      saves,
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
+      collections: new InMemoryCollectionRepository(saves),
       stories: new InMemoryStoryRepository(),
       storyRateLimiter: new InMemoryRateLimiter(2, 60_000),
     };
@@ -427,13 +481,15 @@ describe("FeedService — createPost", () => {
 describe("FeedService — post rate limiting", () => {
   it("blocks post spam beyond the limit", async () => {
     const posts = new InMemoryPostRepository(seedPosts(1));
+    const saves = new InMemorySaveRepository(posts);
     const { InMemoryRateLimiter } = await import("@/server/rate-limit/rate-limiter");
     const deps = {
       posts,
       likes: new InMemoryLikeRepository(),
-      saves: new InMemorySaveRepository(posts),
+      saves,
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
+      collections: new InMemoryCollectionRepository(saves),
       stories: new InMemoryStoryRepository(),
       postRateLimiter: new InMemoryRateLimiter(2, 60_000),
     };
@@ -450,13 +506,15 @@ describe("FeedService — post rate limiting", () => {
 describe("FeedService — comment rate limiting", () => {
   it("blocks comment spam beyond the limit", async () => {
     const posts = new InMemoryPostRepository(seedPosts(1));
+    const saves = new InMemorySaveRepository(posts);
     const { InMemoryRateLimiter } = await import("@/server/rate-limit/rate-limiter");
     const deps = {
       posts,
       likes: new InMemoryLikeRepository(),
-      saves: new InMemorySaveRepository(posts),
+      saves,
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
+      collections: new InMemoryCollectionRepository(saves),
       stories: new InMemoryStoryRepository(),
       commentRateLimiter: new InMemoryRateLimiter(3, 60_000),
     };
