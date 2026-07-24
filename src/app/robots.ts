@@ -4,7 +4,14 @@ export default function robots(): MetadataRoute.Robots {
   const base = process.env.APP_URL ?? "http://localhost:3000";
   return {
     rules: [
-      { userAgent: "*", allow: "/", disallow: ["/api/", "/settings/", "/login", "/register", "/reset-password", "/verify-email"] },
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: [
+          "/api/", "/settings/", "/login", "/register", "/reset-password", "/verify-email",
+          "/messages", "/notifications", "/saved", "/create", "/forgot-password",
+        ],
+      },
     ],
     sitemap: `${base}/sitemap.xml`,
   };
