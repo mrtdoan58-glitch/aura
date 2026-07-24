@@ -87,6 +87,28 @@ describe("FeedService — explore (popularity + offset paging)", () => {
   });
 });
 
+describe("FeedService — getPostsByTag", () => {
+  it("returns only posts carrying the exact tag (case-insensitive), enriched", async () => {
+    const { service } = setup(2);
+    await service.createPost(AUTHOR, {
+      caption: "Etiketli gönderi",
+      tags: ["BenzersizEtiket7", "beton"],
+      location: null,
+      media: [{ type: "image", url: "u", posterUrl: null, width: 100, height: 100, blurDataUrl: null }],
+    });
+    const res = await service.getPostsByTag("benzersizetiket7", { limit: 10 }, VIEWER);
+    expect(res.items.length).toBe(1);
+    expect(res.items[0].tags).toContain("BenzersizEtiket7");
+    expect(res.items[0]).toHaveProperty("savedByMe");
+  });
+
+  it("returns empty for a tag no post has", async () => {
+    const { service } = setup(3);
+    const res = await service.getPostsByTag("kesinlikleolmayanetiket", { limit: 10 }, null);
+    expect(res.items).toHaveLength(0);
+  });
+});
+
 describe("FeedService — searchPosts", () => {
   async function seedOne() {
     const { service } = setup(2);

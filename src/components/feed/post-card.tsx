@@ -116,9 +116,13 @@ export const PostCard = memo(function PostCard({ post, priority }: { post: PostD
         {post.tags.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {post.tags.map((t) => (
-              <span key={t} className="text-[12.5px] font-semibold text-primary">
+              <Link
+                key={t}
+                href={`/tags/${encodeURIComponent(t)}`}
+                className="text-[12.5px] font-semibold text-primary hover:underline"
+              >
                 #{t}
-              </span>
+              </Link>
             ))}
           </div>
         )}

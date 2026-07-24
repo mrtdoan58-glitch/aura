@@ -96,6 +96,8 @@ export interface PostRepository {
   searchPosts(query: string, limit: number): Promise<Post[]>;
   /** Bir kullanıcının profil ızgarası — aynı cursor semantiği, authorId ile filtreli. */
   listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>>;
+  /** Bir etikete (tam eşleşme) sahip gönderiler — zaman-sıralı, aynı cursor semantiği. */
+  listByTag(tag: string, params: CursorParams): Promise<CursorPage<Post>>;
   countByAuthor(authorId: string): Promise<number>;
   findById(id: string): Promise<Post | null>;
   incrementLikeCount(id: string, delta: number): Promise<void>;

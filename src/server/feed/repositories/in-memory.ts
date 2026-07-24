@@ -49,6 +49,10 @@ export class InMemoryPostRepository implements PostRepository {
   async listByAuthor(authorId: string, params: CursorParams) {
     return paginate(this.posts.filter((p) => p.author.id === authorId), params);
   }
+  async listByTag(tag: string, params: CursorParams) {
+    const t = tag.trim().toLowerCase();
+    return paginate(this.posts.filter((p) => p.tags.some((x) => x.toLowerCase() === t)), params);
+  }
   async searchPosts(query: string, limit: number): Promise<Post[]> {
     const q = query.trim().toLowerCase();
     if (!q) return [];

@@ -105,6 +105,16 @@ export class FeedService {
     return this.deps.posts.countByAuthor(authorId);
   }
 
+  /** Bir etikete sahip gönderiler — zaman-sıralı, viewer durumu zenginleştirilmiş. */
+  async getPostsByTag(
+    tag: string,
+    params: { cursor?: string | null; limit?: number },
+    viewerId: string | null
+  ): Promise<CursorPage<PostView>> {
+    const page = await this.deps.posts.listByTag(tag, { cursor: params.cursor, limit: clampLimit(params.limit) });
+    return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
+  }
+
   async getSaved(
     params: { cursor?: string | null; limit?: number },
     viewerId: string

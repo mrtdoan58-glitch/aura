@@ -114,6 +114,24 @@ export class PrismaPostRepository implements PostRepository {
     return rows.map(toPost);
   }
 
+  async listByTag(tag: string, params: CursorParams): Promise<CursorPage<Post>> {
+    const limit = Math.min(Math.max(params.limit, 1), 50);
+    const or = cursorOr(params.cursor);
+    const rows = await prisma.post.findMany({
+      where: { tags: { has: tag.trim().toLowerCase() }, deletedAt: null, ...(or ? { OR: or } : {}) },
+      include: { author: true, media: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    });
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      items: page.map(toPost),
+      nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null,
+    };
+  }
+
   async listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>> {
     const limit = Math.min(Math.max(params.limit, 1), 50);
     const or = cursorOr(params.cursor);
