@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, UserPlus, UserCheck, Pencil, Share2, Settings } from "lucide-react";
+import { BadgeCheck, UserPlus, UserCheck, Pencil, Share2, Settings, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toggleFollowAction } from "@/server/actions/social-actions";
 import { useUIStore } from "@/store/ui-store";
@@ -73,6 +73,9 @@ export function ProfileHeader({ profile }: { profile: ProfileDTO }) {
           <>
             <Button className="flex-1" onClick={() => router.push("/settings/profile")}>
               <Pencil className="h-[17px] w-[17px]" /> Düzenle
+            </Button>
+            <Button variant="ghost" size="icon" className="!h-12 !w-12 !rounded-[16px]" onClick={() => router.push("/saved")} aria-label="Kaydedilenler">
+              <Bookmark className="h-[17px] w-[17px]" />
             </Button>
             <Button variant="ghost" size="icon" className="!h-12 !w-12 !rounded-[16px]" onClick={shareProfile} aria-label="Profili paylaş">
               <Share2 className="h-[17px] w-[17px]" />
