@@ -80,6 +80,12 @@ export class InMemoryConversationRepository implements ConversationRepository {
     );
   }
 
+  async otherLastReadAt(conversationId: string, userId: string): Promise<Date | null> {
+    return (
+      this.store.participants.find((p) => p.conversationId === conversationId && p.userId !== userId)?.lastReadAt ?? null
+    );
+  }
+
   async touch(conversationId: string, at: Date): Promise<void> {
     const c = this.store.conversations.find((x) => x.id === conversationId);
     if (c) c.lastMessageAt = at;

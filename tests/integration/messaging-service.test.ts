@@ -71,6 +71,19 @@ describe("MessagingService — send / list / unread", () => {
     expect(aliceList[0].unreadCount).toBe(0);
   });
 
+  it("exposes the other participant's last-read time (read receipts)", async () => {
+    const { service, ALICE, BOB } = setup();
+    const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
+    const msg = await service.sendMessage(id, ALICE.id, "gördün mü?");
+    // Bob henüz açmadı → Alice'in gördüğü otherLastReadAt mesajdan önce
+    const before = await service.getThread(id, ALICE.id, {});
+    expect(before.otherLastReadAt!.getTime()).toBeLessThan(msg.createdAt.getTime());
+    // Bob konuşmayı açar (okundu) → Alice tekrar bakınca mesaj görülmüş sayılır
+    await service.getThread(id, BOB.id, {});
+    const after = await service.getThread(id, ALICE.id, {});
+    expect(after.otherLastReadAt!.getTime()).toBeGreaterThanOrEqual(msg.createdAt.getTime());
+  });
+
   it("opening the thread marks it read", async () => {
     const { service, ALICE, BOB } = setup();
     const id = await service.getOrCreateConversation(ALICE.id, BOB.id);

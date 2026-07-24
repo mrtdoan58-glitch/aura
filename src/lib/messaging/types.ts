@@ -34,4 +34,5 @@ export interface ThreadDTO {
   otherUser: UserInfoDTO;
   messages: MessageDTO[];
   nextCursor: string | null;
+  otherLastReadAt: string | null;
 }

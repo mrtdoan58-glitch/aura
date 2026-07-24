@@ -51,6 +51,7 @@ export interface ThreadView {
   otherUser: UserInfo;
   messages: Message[]; // createdAt DESC (istemci ters çevirir)
   nextCursor: string | null;
+  otherLastReadAt: Date | null; // karşı taraf buraya kadar okudu (okundu bilgisi)
 }
 
 export class MessagingError extends Error {
@@ -134,9 +135,11 @@ export class MessagingService {
       cursor: params.cursor,
       limit: Math.min(Math.max(params.limit ?? 40, 1), 50),
     });
+    // Karşı tarafın okuma durumu (viewer'ın kendi markRead'inden etkilenmez).
+    const otherLastReadAt = await this.deps.conversations.otherLastReadAt(conversationId, userId);
     // Konuşmayı açmak = okumak: okundu işaretle.
     await this.deps.conversations.markRead(conversationId, userId, this.now());
-    return { id: conversationId, otherUser: toUserInfo(other), messages: page.items, nextCursor: page.nextCursor };
+    return { id: conversationId, otherUser: toUserInfo(other), messages: page.items, nextCursor: page.nextCursor, otherLastReadAt };
   }
 
   async sendMessage(conversationId: string, senderId: string, text: string): Promise<Message> {

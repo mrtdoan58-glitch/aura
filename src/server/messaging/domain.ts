@@ -37,6 +37,8 @@ export interface ConversationRepository {
   listForUser(userId: string): Promise<ConversationSummary[]>;
   isParticipant(conversationId: string, userId: string): Promise<boolean>;
   otherUserId(conversationId: string, userId: string): Promise<string | null>;
+  /** Karşı katılımcının lastReadAt'i (okundu bilgisi için). */
+  otherLastReadAt(conversationId: string, userId: string): Promise<Date | null>;
   /** lastMessageAt güncelle (yeni mesajda). */
   touch(conversationId: string, at: Date): Promise<void>;
   /** Kullanıcının lastReadAt'ini güncelle. */

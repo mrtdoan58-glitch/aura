@@ -99,6 +99,14 @@ export class PrismaConversationRepository implements ConversationRepository {
     return row?.userId ?? null;
   }
 
+  async otherLastReadAt(conversationId: string, userId: string): Promise<Date | null> {
+    const row = await prisma.conversationParticipant.findFirst({
+      where: { conversationId, userId: { not: userId } },
+      select: { lastReadAt: true },
+    });
+    return row?.lastReadAt ?? null;
+  }
+
   async touch(conversationId: string, at: Date): Promise<void> {
     await prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: at } });
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { Fragment, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +32,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const data = query.data;
   const messages = data ? [...data.messages].reverse() : []; // API DESC → gösterim ASC
+
+  // Okundu bilgisi: karşı tarafın okuduğu son "benim" mesajım (altına "Görüldü").
+  const seenUntil = data?.otherLastReadAt ? new Date(data.otherLastReadAt).getTime() : 0;
+  let lastSeenMineId: string | null = null;
+  if (data) {
+    for (const m of messages) {
+      if (m.senderId !== data.otherUser.id && new Date(m.createdAt).getTime() <= seenUntil) lastSeenMineId = m.id;
+    }
+  }
 
   // Thread yüklenince (okundu işaretlendi) liste rozetini tazele.
   useEffect(() => {
@@ -96,8 +105,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           messages.map((m) => {
             const mine = data ? m.senderId !== data.otherUser.id : false;
             return (
+              <Fragment key={m.id}>
               <div
-                key={m.id}
                 className={cn(
                   "max-w-[74%] overflow-hidden rounded-[20px] text-sm leading-snug",
                   m.imageUrl ? "p-1" : "px-4 py-2.5",
@@ -119,6 +128,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   {clock(m.createdAt)}
                 </div>
               </div>
+              {m.id === lastSeenMineId && (
+                <div className="-mt-1 self-end pr-1 text-[10.5px] font-medium text-fg-3">Görüldü</div>
+              )}
+              </Fragment>
             );
           })
         )}
