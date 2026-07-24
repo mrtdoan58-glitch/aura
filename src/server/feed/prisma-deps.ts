@@ -12,6 +12,7 @@ import {
   PrismaPostRepository, PrismaLikeRepository, PrismaSaveRepository,
   PrismaCommentRepository, PrismaStoryRepository, PrismaCommentLikeRepository,
 } from "@/server/feed/repositories/prisma";
+import { getCached, setCached } from "@/server/cache/read-cache";
 
 function buildCommentRateLimiter(): RateLimiter {
   const env = getEnv();
@@ -48,6 +49,7 @@ export function buildPrismaFeedDeps(): FeedDeps {
     comments: new PrismaCommentRepository(),
     commentLikes: new PrismaCommentLikeRepository(),
     stories: new PrismaStoryRepository(),
+    readCache: { get: getCached, set: setCached },
     commentRateLimiter: buildCommentRateLimiter(),
     postRateLimiter: buildPostRateLimiter(),
     storyRateLimiter: buildStoryRateLimiter(),

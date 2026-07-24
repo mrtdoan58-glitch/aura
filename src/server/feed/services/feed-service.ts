@@ -9,6 +9,15 @@ import type {
 } from "@/server/feed/domain";
 import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
 
+/**
+ * Opsiyonel okuma-cache (ör. Upstash). Paylaşılan temel gönderi listesini önbelleğe
+ * alır; kişiselleştirme (likedByMe/savedByMe) ASLA cache'lenmez → çapraz-kullanıcı sızıntısı yok.
+ */
+export interface ReadCachePort {
+  get<T>(key: string): Promise<T | null>;
+  set(key: string, value: unknown, ttlSeconds: number): Promise<void>;
+}
+
 export interface FeedDeps {
   posts: PostRepository;
   likes: LikeRepository;
@@ -19,8 +28,11 @@ export interface FeedDeps {
   commentRateLimiter?: RateLimiter;
   postRateLimiter?: RateLimiter;
   storyRateLimiter?: RateLimiter;
+  readCache?: ReadCachePort;
   now?: () => Date;
 }
+
+const BASE_LIST_TTL = 15; // sn — paylaşılan temel liste; sayaçlar en fazla bu kadar bayat
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 30;
@@ -62,11 +74,34 @@ export class FeedService {
     return posts.map((p) => ({ ...p, likedByMe: liked.has(p.id), savedByMe: saved.has(p.id) }));
   }
 
+  /**
+   * Paylaşılan (viewer'dan bağımsız) temel liste sorgusunu kısa TTL ile cache'ler.
+   * DB'nin ağır olan join'li list sorgusunu çoğu istekten kaldırır; kişiselleştirme
+   * çağıran tarafta enrich() ile taze kalır. Cache yoksa doğrudan fetch (no-op).
+   */
+  private async cachedList(key: string, fetcher: () => Promise<CursorPage<Post>>): Promise<CursorPage<Post>> {
+    const cache = this.deps.readCache;
+    if (cache) {
+      const raw = await cache.get<CursorPage<Post>>(key);
+      if (raw) {
+        // JSON round-trip'te Date string'e döner — Post tipini korumak için canlandır.
+        return { items: raw.items.map((p) => ({ ...p, createdAt: new Date(p.createdAt) })), nextCursor: raw.nextCursor };
+      }
+    }
+    const page = await fetcher();
+    if (cache) await cache.set(key, page, BASE_LIST_TTL);
+    return page;
+  }
+
   async getFeed(
     params: { cursor?: string | null; limit?: number },
     viewerId: string | null
   ): Promise<CursorPage<PostView>> {
-    const page = await this.deps.posts.listFeed({ cursor: params.cursor, limit: clampLimit(params.limit) });
+    const limit = clampLimit(params.limit);
+    const page = await this.cachedList(
+      `base:feed:${params.cursor ?? "0"}:${limit}`,
+      () => this.deps.posts.listFeed({ cursor: params.cursor, limit })
+    );
     return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
   }
 
@@ -75,7 +110,11 @@ export class FeedService {
     params: { cursor?: string | null; limit?: number },
     viewerId: string | null
   ): Promise<CursorPage<PostView>> {
-    const page = await this.deps.posts.listExplore({ cursor: params.cursor, limit: clampLimit(params.limit) });
+    const limit = clampLimit(params.limit);
+    const page = await this.cachedList(
+      `base:explore:${params.cursor ?? "0"}:${limit}`,
+      () => this.deps.posts.listExplore({ cursor: params.cursor, limit })
+    );
     return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
   }
 

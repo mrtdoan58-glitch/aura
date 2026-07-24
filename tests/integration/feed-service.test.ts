@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { FeedService } from "@/server/feed/services/feed-service";
 import { seedPosts } from "@/server/feed/seed";
 import {
@@ -52,6 +52,39 @@ describe("FeedService — cursor pagination", () => {
     const { service } = setup(40);
     const page = await service.getFeed({ limit: 999 }, null);
     expect(page.items.length).toBeLessThanOrEqual(30);
+  });
+});
+
+describe("FeedService — read cache (shared base list, per-viewer enrichment)", () => {
+  it("caches the base list once but keeps likedByMe per-viewer (no cross-user leak)", async () => {
+    const store = new Map<string, unknown>();
+    const cache = {
+      get: async <T>(k: string): Promise<T | null> => (store.has(k) ? (store.get(k) as T) : null),
+      // Redis JSON serileştirmesini taklit et (Date → string): revive yolunu da test eder.
+      set: async (k: string, v: unknown) => { store.set(k, JSON.parse(JSON.stringify(v))); },
+    };
+    const posts = new InMemoryPostRepository(seedPosts(5));
+    const spy = vi.spyOn(posts, "listFeed");
+    const service = new FeedService({
+      posts,
+      likes: new InMemoryLikeRepository(),
+      saves: new InMemorySaveRepository(posts),
+      comments: new InMemoryCommentRepository(),
+      commentLikes: new InMemoryCommentLikeRepository(),
+      stories: new InMemoryStoryRepository(),
+      readCache: cache,
+    });
+
+    const first = (await service.getFeed({ limit: 5 }, "alice")).items[0];
+    await service.setLike(first.id, "alice", true);
+
+    const aliceView = (await service.getFeed({ limit: 5 }, "alice")).items.find((p) => p.id === first.id)!;
+    const bobView = (await service.getFeed({ limit: 5 }, "bob")).items.find((p) => p.id === first.id)!;
+
+    expect(aliceView.likedByMe).toBe(true); // kendi beğenisi
+    expect(bobView.likedByMe).toBe(false); // paylaşılan temel liste ama kişisel enrich → sızıntı yok
+    expect(aliceView.createdAt instanceof Date).toBe(true); // revive çalıştı
+    expect(spy).toHaveBeenCalledTimes(1); // temel liste DB'den yalnızca bir kez çekildi
   });
 });
 
