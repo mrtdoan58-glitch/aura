@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { PostCard } from "@/components/feed/post-card";
 import { PostDetailHeader } from "@/components/feed/post-detail-header";
+import { InlineComments } from "@/components/feed/inline-comments";
 import { getFeedService } from "@/server/feed/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { PostView } from "@/server/feed/domain";
@@ -37,6 +38,7 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
       <div className="mx-auto max-w-[500px]">
         <PostDetailHeader />
         <PostCard post={toPostDTO(post)} priority />
+        <InlineComments postId={post.id} canComment={!!viewer} />
       </div>
     </AppShell>
   );
