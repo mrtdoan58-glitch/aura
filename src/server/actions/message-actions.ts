@@ -8,6 +8,7 @@ import { put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { getMessagingService, MessagingError } from "@/server/messaging/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
+import { publishConversationUpdate } from "@/server/realtime/pusher";
 import type { MessageDTO } from "@/lib/messaging/types";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -44,6 +45,7 @@ export async function sendMessageAction(conversationId: string, text: string): P
   if (!user) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
   try {
     const m = await getMessagingService().sendMessage(conversationId, user.id, text);
+    await publishConversationUpdate(conversationId);
     return { ok: true, data: { ...m, createdAt: m.createdAt.toISOString() } };
   } catch (e) {
     return fail(e);
@@ -64,6 +66,7 @@ export async function sendImageMessageAction(formData: FormData): Promise<Action
   try {
     const blob = await put(`messages/${user.id}/${randomUUID()}-${file.name}`, file, { access: "public", addRandomSuffix: false });
     const m = await getMessagingService().sendImageMessage(conversationId, user.id, blob.url, caption);
+    await publishConversationUpdate(conversationId);
     return { ok: true, data: { ...m, createdAt: m.createdAt.toISOString() } };
   } catch (e) {
     return fail(e);

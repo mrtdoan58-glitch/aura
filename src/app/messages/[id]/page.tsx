@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, use, useEffect, useRef, useState } from "react";
+import { Fragment, use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { ArrowLeft, Send, BadgeCheck, ImageIcon, SmilePlus } from "lucide-react"
 import { Avatar } from "@/components/ui/avatar";
 import { ErrorState } from "@/components/feed/states";
 import { useThread } from "@/hooks/use-thread";
+import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
 import { useHaptic } from "@/hooks/use-haptic";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setPickerFor(null);
     react.mutate({ messageId, emoji: alreadyMine ? null : emoji });
   };
+
+  // Gerçek-zamanlı: Pusher yapılandırıldıysa güncelleme geldiğinde anında tazele
+  // (yapılandırılmadıysa no-op; use-thread'in polling'i zaten devrede).
+  const onRealtimeUpdate = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["thread", id] });
+    qc.invalidateQueries({ queryKey: ["conversations"] });
+  }, [qc, id]);
+  useConversationRealtime(id, onRealtimeUpdate);
 
   const pickImage = (file: File | undefined) => {
     if (!file) return;

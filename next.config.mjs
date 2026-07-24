@@ -13,6 +13,12 @@ const sentryIngestHost = process.env.NEXT_PUBLIC_SENTRY_DSN
   ? new URL(process.env.NEXT_PUBLIC_SENTRY_DSN).host
   : null;
 
+// Gerçek-zamanlı DM Pusher ile yapılandırıldıysa, istemci websocket'i için CSP connect-src'e
+// Pusher host'larını ekle (yalnızca anahtar varsa — aksi halde CSP dar kalır).
+const pusherConnect = process.env.NEXT_PUBLIC_PUSHER_KEY
+  ? " https://*.pusher.com wss://*.pusher.com https://sockjs.pusher.com wss://ws.pusher.com"
+  : "";
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   {
@@ -23,7 +29,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      `connect-src 'self'${sentryIngestHost ? ` https://${sentryIngestHost}` : ""}`,
+      `connect-src 'self'${sentryIngestHost ? ` https://${sentryIngestHost}` : ""}${pusherConnect}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

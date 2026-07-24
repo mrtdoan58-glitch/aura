@@ -10,6 +10,11 @@ const schema = z.object({
   RESEND_EMAIL_DOMAIN: z.string().optional(),
   KV_REST_API_URL: z.string().url().optional(),
   KV_REST_API_TOKEN: z.string().optional(),
+  // Gerçek-zamanlı DM (opsiyonel) — yoksa istemci polling'e düşer.
+  PUSHER_APP_ID: z.string().optional(),
+  PUSHER_SECRET: z.string().optional(),
+  NEXT_PUBLIC_PUSHER_KEY: z.string().optional(),
+  NEXT_PUBLIC_PUSHER_CLUSTER: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;
