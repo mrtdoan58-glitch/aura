@@ -45,6 +45,8 @@ model User {
   followers    Follow[]    @relation("Followers")
   notificationsReceived Notification[] @relation("NotificationsReceived")
   notificationsSent     Notification[] @relation("NotificationsSent")
+  conversationLinks     ConversationParticipant[] @relation("UserConversations")
+  sentMessages          Message[]                 @relation("UserMessages")
 
   @@index([email])
   @@index([username])
@@ -254,4 +256,44 @@ model Notification {
   createdAt    DateTime         @default(now())
 
   @@index([recipientId, createdAt])
+}
+
+// Birebir (1:1) doğrudan mesajlaşma. `key` = iki kullanıcı id'sinin sıralı birleşimi
+// ("a:b") — tekilliği garanti eder, find-or-create'i tek sorguya indirir.
+model Conversation {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  createdAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt])
+}
+
+// Kullanıcının bir konuşmadaki üyeliği + okundu durumu (lastReadAt) — okunmamış
+// sayısı bununla hesaplanır (lastReadAt'ten sonra, karşı taraftan gelen mesajlar).
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("UserMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  text           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt, id])
 }

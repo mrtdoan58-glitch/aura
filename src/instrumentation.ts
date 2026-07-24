@@ -33,6 +33,11 @@ export async function register() {
       const { configureNotificationDeps } = await import("@/server/notifications/container");
       const { buildPrismaNotificationDeps } = await import("@/server/notifications/prisma-deps");
       configureNotificationDeps(buildPrismaNotificationDeps());
+
+      // messaging, kullanıcı bilgisi için auth'u kullanır — auth'tan SONRA.
+      const { configureMessagingDeps } = await import("@/server/messaging/container");
+      const { buildPrismaMessagingDeps } = await import("@/server/messaging/prisma-deps");
+      configureMessagingDeps(buildPrismaMessagingDeps());
     }
   }
 }

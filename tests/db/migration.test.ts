@@ -8,7 +8,7 @@ describe("DB migration (real Postgres via PGlite)", () => {
       `SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name`
     );
     const tables = res.rows.map((r) => r.table_name);
-    for (const t of ["User", "Session", "Post", "Media", "Comment", "Like", "SavedPost", "Story", "StoryView", "Follow", "LoginAttempt", "Notification"]) {
+    for (const t of ["User", "Session", "Post", "Media", "Comment", "Like", "SavedPost", "Story", "StoryView", "Follow", "LoginAttempt", "Notification", "Conversation", "ConversationParticipant", "Message"]) {
       expect(tables).toContain(t);
     }
   });

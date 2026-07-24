@@ -5,10 +5,12 @@ import { Sparkles, Search, Heart, Send } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useConversations } from "@/hooks/use-conversations";
 
 export function AppBar() {
   const { query } = useNotifications();
   const hasUnread = (query.data?.unreadCount ?? 0) > 0;
+  const { hasUnread: hasUnreadMessages } = useConversations();
   return (
     <header className="glass sticky top-0 z-30 flex items-center justify-between border-b border-border px-5 py-3">
       <Link href="/" className="flex items-center gap-2.5 text-[21px] font-extrabold tracking-tight">
@@ -30,7 +32,7 @@ export function AppBar() {
           </IconButton>
         </Link>
         <Link href="/messages" aria-label="Mesajlar">
-          <IconButton badge aria-label="Mesajlar">
+          <IconButton badge={hasUnreadMessages} aria-label="Mesajlar">
             <Send className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </IconButton>
         </Link>
