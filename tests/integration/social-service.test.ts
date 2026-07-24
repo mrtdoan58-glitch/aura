@@ -29,12 +29,22 @@ function setup() {
     [BOB.username, BOB],
   ]);
   const postCounts = new Map<string, number>([[ALICE.id, 3]]);
+  const follows = new InMemoryFollowRepository();
   const service = new SocialService({
-    follows: new InMemoryFollowRepository(),
-    users: { getUserByUsername: async (username) => users.get(username) ?? null },
+    follows,
+    users: {
+      getUserByUsername: async (username) => users.get(username) ?? null,
+      searchUsers: async (q, limit) => {
+        const ql = q.trim().toLowerCase();
+        if (!ql) return [];
+        return [...users.values()]
+          .filter((u) => u.username.includes(ql) || u.name.toLowerCase().includes(ql))
+          .slice(0, limit);
+      },
+    },
     posts: { countPostsByAuthor: async (authorId) => postCounts.get(authorId) ?? 0 },
   });
-  return { service, ALICE, BOB };
+  return { service, follows, ALICE, BOB };
 }
 
 describe("SocialService — getProfile", () => {
@@ -91,6 +101,30 @@ describe("SocialService — setFollow", () => {
   it("requires authentication", async () => {
     const { service, ALICE } = setup();
     await expect(service.setFollow("", ALICE.id, true)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+  });
+});
+
+describe("SocialService — searchUsers", () => {
+  it("matches by username or name and marks isMe", async () => {
+    const { service, ALICE } = setup();
+    const res = await service.searchUsers("ali", ALICE.id);
+    expect(res).toHaveLength(1);
+    expect(res[0].username).toBe("alice");
+    expect(res[0].isMe).toBe(true);
+    expect(res[0].followedByMe).toBe(false);
+  });
+
+  it("reports followedByMe for a followed result", async () => {
+    const { service, follows, ALICE, BOB } = setup();
+    await follows.add(BOB.id, ALICE.id);
+    const res = await service.searchUsers("alice", BOB.id);
+    expect(res[0].followedByMe).toBe(true);
+    expect(res[0].isMe).toBe(false);
+  });
+
+  it("returns empty for a whitespace query", async () => {
+    const { service } = setup();
+    expect(await service.searchUsers("   ", null)).toHaveLength(0);
   });
 });
 

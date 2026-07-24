@@ -98,6 +98,22 @@ export class PrismaPostRepository implements PostRepository {
     };
   }
 
+  async searchPosts(query: string, limit: number): Promise<Post[]> {
+    const q = query.trim();
+    if (!q) return [];
+    const tag = q.replace(/^#/, "").toLowerCase();
+    const rows = await prisma.post.findMany({
+      where: {
+        deletedAt: null,
+        OR: [{ caption: { contains: q, mode: "insensitive" } }, { tags: { has: tag } }],
+      },
+      include: { author: true, media: true },
+      orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      take: Math.max(1, limit),
+    });
+    return rows.map(toPost);
+  }
+
   async listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>> {
     const limit = Math.min(Math.max(params.limit, 1), 50);
     const or = cursorOr(params.cursor);

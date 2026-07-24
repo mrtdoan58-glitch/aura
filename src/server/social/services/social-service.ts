@@ -2,7 +2,7 @@
  * SocialService — takip ilişkisi ve herkese açık profil iş kuralları.
  * Bağımlılıklar arayüzle enjekte edilir; Prisma olmadan test edilebilir.
  */
-import type { FollowRepository, Profile } from "@/server/social/domain";
+import type { FollowRepository, Profile, UserResult } from "@/server/social/domain";
 import type { User } from "@/server/auth/domain";
 
 const DEFAULT_AVATAR = "https://i.pravatar.cc/200?img=68";
@@ -18,6 +18,7 @@ export interface PostCounter {
  */
 export interface UserLookup {
   getUserByUsername(username: string): Promise<User | null>;
+  searchUsers(query: string, limit: number): Promise<User[]>;
 }
 
 export interface SocialDeps {
@@ -60,6 +61,23 @@ export class SocialService {
       followedByMe,
       isMe: viewerId === user.id,
     };
+  }
+
+  /** Kullanıcı araması — her satır için viewer'ın takip/kendisi durumunu ekler. */
+  async searchUsers(query: string, viewerId: string | null, limit = 10): Promise<UserResult[]> {
+    const users = await this.deps.users.searchUsers(query, limit);
+    return Promise.all(
+      users.map(async (u): Promise<UserResult> => ({
+        id: u.id,
+        name: u.name,
+        username: u.username,
+        avatarUrl: u.avatarUrl ?? DEFAULT_AVATAR,
+        verified: u.role !== "USER",
+        followedByMe:
+          viewerId && viewerId !== u.id ? await this.deps.follows.exists(viewerId, u.id) : false,
+        isMe: viewerId === u.id,
+      }))
+    );
   }
 
   async setFollow(

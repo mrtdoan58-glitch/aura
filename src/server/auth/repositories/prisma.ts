@@ -18,6 +18,20 @@ export class PrismaUserRepository implements UserRepository {
   findByUsername(username: string): Promise<User | null> {
     return prisma.user.findUnique({ where: { username: username.toLowerCase() } }) as Promise<User | null>;
   }
+  searchUsers(query: string, limit: number): Promise<User[]> {
+    const q = query.trim();
+    if (!q) return Promise.resolve([]);
+    return prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { username: "asc" },
+      take: Math.max(1, limit),
+    }) as Promise<User[]>;
+  }
   create(data: NewUser): Promise<User> {
     return prisma.user.create({
       data: {

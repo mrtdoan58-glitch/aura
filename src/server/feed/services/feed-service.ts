@@ -78,6 +78,12 @@ export class FeedService {
     return { items: await this.enrich(page.items, viewerId), nextCursor: page.nextCursor };
   }
 
+  /** Arama sonuçları — caption/etiket eşleşen gönderiler, viewer durumu zenginleştirilmiş. */
+  async searchPosts(query: string, viewerId: string | null, limit = 18): Promise<PostView[]> {
+    const posts = await this.deps.posts.searchPosts(query, clampLimit(limit));
+    return this.enrich(posts, viewerId);
+  }
+
   async getPost(id: string, viewerId: string | null): Promise<PostView> {
     const post = await this.deps.posts.findById(id);
     if (!post) throw new FeedError("NOT_FOUND", "Gönderi bulunamadı.");

@@ -11,6 +11,17 @@ export interface FollowRepository {
   countFollowing(userId: string): Promise<number>;
 }
 
+/** Arama sonucu satırı — profilin hafif bir alt kümesi (sayaç yok). */
+export interface UserResult {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl: string;
+  verified: boolean;
+  followedByMe: boolean;
+  isMe: boolean;
+}
+
 /** Herkese açık profil görünümü — istemciye dönmeden önce servis tarafından zenginleştirilir. */
 export interface Profile {
   id: string;

@@ -19,8 +19,8 @@ export function AppBar() {
       </Link>
       <div className="flex items-center gap-1">
         <ThemeToggle />
-        <Link href="/explore" aria-label="Keşfet">
-          <IconButton aria-label="Keşfet">
+        <Link href="/search" aria-label="Ara">
+          <IconButton aria-label="Ara">
             <Search className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </IconButton>
         </Link>

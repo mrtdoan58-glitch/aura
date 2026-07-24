@@ -61,6 +61,8 @@ export interface UserRepository {
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
   findByUsername(username: string): Promise<User | null>;
+  /** username veya name içinde (harf-duyarsız) geçenler; en fazla `limit` kayıt. */
+  searchUsers(query: string, limit: number): Promise<User[]>;
   create(data: NewUser): Promise<User>;
   update(id: string, data: Partial<User>): Promise<User>;
 }

@@ -49,6 +49,15 @@ export class InMemoryPostRepository implements PostRepository {
   async listByAuthor(authorId: string, params: CursorParams) {
     return paginate(this.posts.filter((p) => p.author.id === authorId), params);
   }
+  async searchPosts(query: string, limit: number): Promise<Post[]> {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const tag = q.replace(/^#/, "");
+    return this.posts
+      .filter((p) => p.caption.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase() === tag))
+      .sort((a, b) => b.likeCount - a.likeCount || b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, Math.max(1, limit));
+  }
   async countByAuthor(authorId: string) {
     return this.posts.filter((p) => p.author.id === authorId).length;
   }

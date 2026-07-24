@@ -92,6 +92,8 @@ export interface PostRepository {
    * cursor = sayısal offset string'i.
    */
   listExplore(params: CursorParams): Promise<CursorPage<Post>>;
+  /** Arama — caption içinde (harf-duyarsız) geçen ya da tam etiket eşleşen gönderiler. */
+  searchPosts(query: string, limit: number): Promise<Post[]>;
   /** Bir kullanıcının profil ızgarası — aynı cursor semantiği, authorId ile filtreli. */
   listByAuthor(authorId: string, params: CursorParams): Promise<CursorPage<Post>>;
   countByAuthor(authorId: string): Promise<number>;

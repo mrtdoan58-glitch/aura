@@ -20,6 +20,14 @@ export class InMemoryUserRepository implements UserRepository {
   async findByUsername(username: string) {
     return [...this.users.values()].find((u) => u.username === username.toLowerCase()) ?? null;
   }
+  async searchUsers(query: string, limit: number): Promise<User[]> {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return [...this.users.values()]
+      .filter((u) => u.username.includes(q) || u.name.toLowerCase().includes(q))
+      .sort((a, b) => a.username.localeCompare(b.username))
+      .slice(0, Math.max(1, limit));
+  }
   async create(data: NewUser): Promise<User> {
     const now = new Date();
     const user: User = {

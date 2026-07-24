@@ -87,6 +87,36 @@ describe("FeedService — explore (popularity + offset paging)", () => {
   });
 });
 
+describe("FeedService — searchPosts", () => {
+  async function seedOne() {
+    const { service } = setup(2);
+    await service.createPost(AUTHOR, {
+      caption: "Kuzey ışıkları altında bir gece",
+      tags: ["gökyüzü", "seyahat"],
+      location: null,
+      media: [{ type: "image", url: "u", posterUrl: null, width: 100, height: 100, blurDataUrl: null }],
+    });
+    return service;
+  }
+
+  it("matches by caption substring (case-insensitive)", async () => {
+    const service = await seedOne();
+    const res = await service.searchPosts("kuzey", VIEWER);
+    expect(res.some((p) => p.caption.includes("Kuzey"))).toBe(true);
+  });
+
+  it("matches by exact tag (with or without #)", async () => {
+    const service = await seedOne();
+    expect((await service.searchPosts("seyahat", VIEWER)).length).toBeGreaterThan(0);
+    expect((await service.searchPosts("#gökyüzü", VIEWER)).length).toBeGreaterThan(0);
+  });
+
+  it("returns empty for a whitespace query", async () => {
+    const service = await seedOne();
+    expect(await service.searchPosts("   ", VIEWER)).toHaveLength(0);
+  });
+});
+
 describe("FeedService — like/save (idempotent + counters)", () => {
   it("likes and unlikes, keeping the counter consistent", async () => {
     const { service } = setup(3);

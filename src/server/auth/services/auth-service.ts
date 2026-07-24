@@ -229,6 +229,9 @@ export class AuthService {
   async getUserByUsername(username: string): Promise<User | null> {
     return this.deps.users.findByUsername(username);
   }
+  async searchUsers(query: string, limit: number): Promise<User[]> {
+    return this.deps.users.searchUsers(query, limit);
+  }
 
   /* --------------------------- Çıkış --------------------------- */
   async logout(refreshToken: string): Promise<void> {
