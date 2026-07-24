@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProfileHeader } from "@/components/social/profile-header";
@@ -5,6 +6,24 @@ import { ProfilePostsGrid } from "@/components/social/profile-posts-grid";
 import { getSocialService, SocialError } from "@/server/social/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { ProfileDTO } from "@/lib/social/types";
+
+/** Paylaşılan profil bağlantıları için zengin önizleme (Open Graph / Twitter). */
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params;
+  try {
+    const p = await getSocialService().getProfile(username, null);
+    const title = `${p.name} (@${p.username})`;
+    const description = `${p.name} — Aura'da ${p.postCount} paylaşım · ${p.followerCount} takipçi`;
+    return {
+      title,
+      description,
+      openGraph: { title, description, type: "profile", images: [p.avatarUrl] },
+      twitter: { card: "summary", title, description, images: [p.avatarUrl] },
+    };
+  } catch {
+    return { title: "Profil" };
+  }
+}
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;

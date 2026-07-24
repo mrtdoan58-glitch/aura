@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { PostCard } from "@/components/feed/post-card";
@@ -10,6 +11,26 @@ import type { PostDTO } from "@/lib/feed/types";
 
 function toPostDTO(p: PostView): PostDTO {
   return { ...p, createdAt: p.createdAt.toISOString() };
+}
+
+/** Paylaşılan gönderi bağlantıları için zengin önizleme (Open Graph / Twitter). */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const post = await getFeedService().getPost(id, null);
+    const caption = post.caption.trim();
+    const title = caption ? `${post.author.name}: ${caption.slice(0, 60)}` : `${post.author.name} paylaşımı`;
+    const description = caption.slice(0, 160) || `${post.author.name} (@${post.author.username}) paylaşımı`;
+    const image = post.media[0]?.url;
+    return {
+      title,
+      description,
+      openGraph: { title, description, type: "article", images: image ? [image] : [] },
+      twitter: { card: "summary_large_image", title, description, images: image ? [image] : [] },
+    };
+  } catch {
+    return { title: "Gönderi" };
+  }
 }
 
 /**
