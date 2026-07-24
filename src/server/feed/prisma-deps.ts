@@ -10,7 +10,7 @@ import { getEnv } from "@/lib/env";
 import { Redis } from "@upstash/redis";
 import {
   PrismaPostRepository, PrismaLikeRepository, PrismaSaveRepository,
-  PrismaCommentRepository, PrismaStoryRepository, PrismaCommentLikeRepository, PrismaCollectionRepository,
+  PrismaCommentRepository, PrismaStoryRepository, PrismaCommentLikeRepository, PrismaCollectionRepository, PrismaHighlightRepository,
 } from "@/server/feed/repositories/prisma";
 import { getCached, setCached } from "@/server/cache/read-cache";
 
@@ -49,6 +49,7 @@ export function buildPrismaFeedDeps(): FeedDeps {
     comments: new PrismaCommentRepository(),
     commentLikes: new PrismaCommentLikeRepository(),
     collections: new PrismaCollectionRepository(),
+    highlights: new PrismaHighlightRepository(),
     stories: new PrismaStoryRepository(),
     readCache: { get: getCached, set: setCached },
     commentRateLimiter: buildCommentRateLimiter(),

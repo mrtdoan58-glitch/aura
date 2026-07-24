@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProfileHeader } from "@/components/social/profile-header";
 import { ProfilePostsGrid } from "@/components/social/profile-posts-grid";
+import { ProfileHighlights } from "@/components/social/profile-highlights";
 import { getSocialService, SocialError } from "@/server/social/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { ProfileDTO } from "@/lib/social/types";
@@ -42,6 +43,16 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
       <div className="mx-auto max-w-[500px]">
         <div className="story-ring h-28 w-full" />
         <ProfileHeader profile={profile} />
+        <ProfileHighlights
+          author={{
+            id: profile.id,
+            name: profile.name,
+            username: profile.username,
+            avatarUrl: profile.avatarUrl,
+            verified: profile.verified,
+          }}
+          isOwner={viewer?.id === profile.id}
+        />
         <div className="glass sticky top-0 z-20 mt-4 border-b border-border py-3 text-center text-[13px] font-bold text-fg-2">
           Gönderiler
         </div>

@@ -2,16 +2,36 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { X, Heart, Send } from "lucide-react";
+import { X, Heart, Send, Loader2 } from "lucide-react";
 import type { StoryDTO } from "@/lib/feed/types";
 import { markStorySeenAction } from "@/server/actions/feed-actions";
+import { startConversationAction, sendMessageAction } from "@/server/actions/message-actions";
+import { useUIStore } from "@/store/ui-store";
 import { relativeTime } from "@/lib/feed/format";
 import { cn } from "@/lib/utils";
 
 const DURATION = 5000;
 
-export function StoryViewer({ stories, start, onClose }: { stories: StoryDTO[]; start: number; onClose: () => void }) {
+export function StoryViewer({
+  stories,
+  start,
+  onClose,
+  markSeen = true,
+  canReply = true,
+}: {
+  stories: StoryDTO[];
+  start: number;
+  onClose: () => void;
+  /** Vurgularda kapalı: öğeler hikayenin kopyasıdır, kaynak hikaye silinmiş olabilir. */
+  markSeen?: boolean;
+  /** Kendi hikayende ve çıkış yapmışken kapalı. */
+  canReply?: boolean;
+}) {
   const [index, setIndex] = useState(start);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const showToast = useUIStore((s) => s.showToast);
   const story = stories[index];
 
   const next = useCallback(() => {
@@ -26,10 +46,11 @@ export function StoryViewer({ stories, start, onClose }: { stories: StoryDTO[]; 
 
   useEffect(() => {
     if (!story) return;
-    void markStorySeenAction(story.id);
+    if (markSeen) void markStorySeenAction(story.id);
+    if (paused) return; // yanıt yazarken otomatik ilerleme durur
     const t = setTimeout(next, DURATION);
     return () => clearTimeout(t);
-  }, [story, next]);
+  }, [story, next, markSeen, paused]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -41,6 +62,25 @@ export function StoryViewer({ stories, start, onClose }: { stories: StoryDTO[]; 
     return () => window.removeEventListener("keydown", onKey);
   }, [next, onClose]);
 
+  /** Yanıt, hikaye sahibine gerçek bir DM olarak gider. */
+  const send = async (text: string) => {
+    const trimmed = text.trim();
+    if (!story || !trimmed || sending) return;
+    setSending(true);
+    try {
+      const conv = await startConversationAction(story.author.username);
+      if (!conv.ok || !conv.data) {
+        showToast(conv.error ?? "Yanıt gönderilemedi");
+        return;
+      }
+      const res = await sendMessageAction(conv.data.conversationId, trimmed);
+      showToast(res.ok ? "Yanıtın gönderildi" : (res.error ?? "Yanıt gönderilemedi"));
+      if (res.ok) setReply("");
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (!story) return null;
 
   return (
@@ -50,7 +90,11 @@ export function StoryViewer({ stories, start, onClose }: { stories: StoryDTO[]; 
           <div key={k} className="h-[3px] flex-1 overflow-hidden rounded bg-white/30">
             <div
               className={cn("h-full rounded bg-white", k < index && "w-full")}
-              style={k === index ? { animation: `storyprogress ${DURATION}ms linear forwards` } : { width: k < index ? "100%" : 0 }}
+              style={
+                k === index && !paused
+                  ? { animation: `storyprogress ${DURATION}ms linear forwards` }
+                  : { width: k <= index ? "100%" : 0 }
+              }
             />
           </div>
         ))}
@@ -60,7 +104,7 @@ export function StoryViewer({ stories, start, onClose }: { stories: StoryDTO[]; 
         <Image src={story.author.avatarUrl} alt="" width={38} height={38} className="rounded-full border-2 border-white/30" />
         <div>
           <div className="text-sm font-bold text-white">{story.author.username}</div>
-          <div className="text-xs text-white/70">{relativeTime(story.createdAt)}</div>
+          {markSeen && <div className="text-xs text-white/70">{relativeTime(story.createdAt)}</div>}
         </div>
         <button onClick={onClose} className="ml-auto grid h-9 w-9 place-items-center text-white" aria-label="Kapat">
           <X className="h-[26px] w-[26px]" />
@@ -74,11 +118,33 @@ export function StoryViewer({ stories, start, onClose }: { stories: StoryDTO[]; 
         <button className="absolute right-0 top-0 h-full w-1/3" onClick={next} aria-label="Sonraki hikaye" />
       </div>
 
-      <div className="flex items-center gap-3 px-4 pb-7 pt-3.5">
-        <div className="flex-1 rounded-full border-[1.5px] border-white/40 px-4 py-3 text-sm text-white/70">Yanıt gönder...</div>
-        <Heart className="h-[26px] w-[26px] text-white" />
-        <Send className="h-[26px] w-[26px] text-white" />
-      </div>
+      {canReply ? (
+        <div className="flex items-center gap-3 px-4 pb-7 pt-3.5">
+          <input
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onFocus={() => setPaused(true)}
+            onBlur={() => setPaused(false)}
+            onKeyDown={(e) => e.key === "Enter" && void send(reply)}
+            maxLength={1000}
+            placeholder="Yanıt gönder..."
+            aria-label={`${story.author.username} kullanıcısına yanıt`}
+            className="flex-1 rounded-full border-[1.5px] border-white/40 bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-white/70"
+          />
+          <button onClick={() => void send("❤️")} disabled={sending} aria-label="Kalp gönder">
+            <Heart className="h-[26px] w-[26px] text-white" />
+          </button>
+          <button onClick={() => void send(reply)} disabled={sending || !reply.trim()} aria-label="Yanıtı gönder">
+            {sending ? (
+              <Loader2 className="h-[26px] w-[26px] animate-spin text-white" />
+            ) : (
+              <Send className={cn("h-[26px] w-[26px] text-white", !reply.trim() && "opacity-40")} />
+            )}
+          </button>
+        </div>
+      ) : (
+        <div className="pb-7" />
+      )}
       <style>{`@keyframes storyprogress{to{width:100%}}`}</style>
     </div>
   );

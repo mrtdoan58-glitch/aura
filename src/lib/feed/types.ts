@@ -55,6 +55,18 @@ export interface CollectionDTO {
   coverUrl: string | null;
   createdAt: string;
 }
+export interface HighlightDTO {
+  id: string;
+  title: string;
+  coverUrl: string | null;
+  itemCount: number;
+  createdAt: string;
+}
+export interface HighlightItemDTO {
+  id: string;
+  url: string;
+  type: MediaDTO["type"];
+}
 export interface CursorPageDTO<T> {
   items: T[];
   nextCursor: string | null;

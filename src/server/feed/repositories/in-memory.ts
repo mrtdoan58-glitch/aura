@@ -7,6 +7,7 @@ import type {
   Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
   Collection, CollectionRepository,
+  Highlight, HighlightDetail, HighlightRepository,
 } from "@/server/feed/domain";
 import { encodeCursor, decodeCursor, isAfterCursor } from "@/server/feed/cursor";
 import { seedPosts, seedStories } from "@/server/feed/seed";
@@ -208,6 +209,55 @@ export class InMemoryCollectionRepository implements CollectionRepository {
   }
 }
 
+export class InMemoryHighlightRepository implements HighlightRepository {
+  private rows: (HighlightDetail & { userId: string })[] = [];
+
+  private summary(h: HighlightDetail): Highlight {
+    return {
+      id: h.id,
+      title: h.title,
+      coverUrl: h.items[0]?.media.url ?? null,
+      itemCount: h.items.length,
+      createdAt: h.createdAt,
+    };
+  }
+  async listForUser(userId: string): Promise<Highlight[]> {
+    return this.rows
+      .filter((h) => h.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((h) => this.summary(h));
+  }
+  async get(highlightId: string): Promise<HighlightDetail | null> {
+    return this.rows.find((h) => h.id === highlightId) ?? null;
+  }
+  async create(
+    userId: string,
+    title: string,
+    items: { storyId: string | null; mediaUrl: string; type: MediaType }[]
+  ): Promise<Highlight> {
+    const now = new Date();
+    const row: HighlightDetail & { userId: string } = {
+      id: randomUUID(),
+      userId,
+      title,
+      coverUrl: items[0]?.mediaUrl ?? null,
+      itemCount: items.length,
+      createdAt: now,
+      items: items.map((it, i) => ({
+        id: randomUUID(),
+        storyId: it.storyId,
+        media: { id: randomUUID(), type: it.type, url: it.mediaUrl, posterUrl: null, width: 1080, height: 1350, blurDataUrl: null, order: i },
+        createdAt: now,
+      })),
+    };
+    this.rows.push(row);
+    return this.summary(row);
+  }
+  async delete(userId: string, highlightId: string): Promise<void> {
+    this.rows = this.rows.filter((h) => !(h.id === highlightId && h.userId === userId));
+  }
+}
+
 export class InMemoryCommentRepository implements CommentRepository {
   private comments: Comment[] = [];
   private replyCount(id: string) {
@@ -268,6 +318,12 @@ export class InMemoryStoryRepository implements StoryRepository {
       .filter((s) => s.expiresAt > now)
       .map((s) => ({ ...s, seenByMe: viewerId ? this.seen.has(`${viewerId}:${s.id}`) || s.seenByMe : s.seenByMe }))
       .sort((a, b) => Number(a.seenByMe) - Number(b.seenByMe) || b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  async listByAuthor(authorId: string, limit: number): Promise<Story[]> {
+    return this.stories
+      .filter((s) => s.author.id === authorId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
   }
   async markSeen(storyId: string, viewerId: string) {
     this.seen.add(`${viewerId}:${storyId}`);

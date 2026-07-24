@@ -1,26 +1,16 @@
-"use client";
-
-import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { AppBar } from "@/components/layout/app-bar";
-import { StoryRail } from "@/components/feed/story-rail";
-import { StoryViewer } from "@/components/feed/story-viewer";
-import { FeedList } from "@/components/feed/feed-list";
-import type { StoryDTO } from "@/lib/feed/types";
+import { HomeClient } from "@/components/feed/home-client";
+import { getCurrentUser } from "@/server/auth/current-user";
+import { DEFAULT_AVATAR_URL } from "@/lib/feed/constants";
 
-export default function HomePage() {
-  const [viewer, setViewer] = useState<{ stories: StoryDTO[]; index: number } | null>(null);
+export default async function HomePage() {
+  const user = await getCurrentUser();
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-[500px]">
-        <AppBar />
-        <StoryRail onOpen={(stories, index) => setViewer({ stories, index })} />
-        <FeedList />
-      </div>
-      {viewer && (
-        <StoryViewer stories={viewer.stories} start={viewer.index} onClose={() => setViewer(null)} />
-      )}
+      <HomeClient
+        viewer={user ? { username: user.username, avatarUrl: user.avatarUrl ?? DEFAULT_AVATAR_URL } : null}
+      />
     </AppShell>
   );
 }

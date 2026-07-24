@@ -10,7 +10,7 @@ import { getFeedService, FeedError } from "@/server/feed/container-actions";
 import { notify } from "@/server/notifications/container-actions";
 import { getCurrentUser } from "@/server/auth/current-user";
 import type { Comment, Post, Story, NewPostMedia } from "@/server/feed/domain";
-import type { CommentDTO, PostDTO, StoryDTO, CollectionDTO } from "@/lib/feed/types";
+import type { CommentDTO, PostDTO, StoryDTO, CollectionDTO, HighlightDTO } from "@/lib/feed/types";
 
 function toDTO(c: Comment): CommentDTO {
   return { ...c, createdAt: c.createdAt.toISOString() };
@@ -238,6 +238,31 @@ export async function createStoryAction(formData: FormData): Promise<ActionResul
     });
     const story = await getFeedService().createStory(author, { mediaUrl: blob.url, type: "image" });
     return { ok: true, data: toStoryDTO(story) };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
+/* --------------------------- Hikaye vurguları --------------------------- */
+export async function createHighlightAction(title: string, storyIds: string[]): Promise<ActionResult<HighlightDTO>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    const h = await getFeedService().createHighlight(author.id, title, storyIds);
+    return { ok: true, data: { ...h, createdAt: h.createdAt.toISOString() } };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
+export async function deleteHighlightAction(highlightId: string): Promise<ActionResult<null>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    await getFeedService().deleteHighlight(author.id, highlightId);
+    return { ok: true, data: null };
   } catch (e) {
     if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
     return { ok: false, error: "Beklenmeyen bir hata oluştu." };

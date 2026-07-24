@@ -15,7 +15,14 @@ async function fetchStories(): Promise<CursorPageDTO<StoryDTO>> {
   return res.json();
 }
 
-export function StoryRail({ onOpen }: { onOpen: (stories: StoryDTO[], index: number) => void }) {
+export function StoryRail({
+  viewer,
+  onOpen,
+}: {
+  /** Oturum sahibi; null ise "Hikayen ekle" düğmesi gösterilmez. */
+  viewer: { username: string; avatarUrl: string } | null;
+  onOpen: (stories: StoryDTO[], index: number) => void;
+}) {
   const qc = useQueryClient();
   const showToast = useUIStore((s) => s.showToast);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +70,7 @@ export function StoryRail({ onOpen }: { onOpen: (stories: StoryDTO[], index: num
           e.target.value = "";
         }}
       />
+      {viewer && (
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={create.isPending}
@@ -70,7 +78,7 @@ export function StoryRail({ onOpen }: { onOpen: (stories: StoryDTO[], index: num
         aria-label="Hikayen ekle"
       >
         <div className="relative h-[66px] w-[66px] rounded-full bg-border p-[2.5px]">
-          <Image src="https://i.pravatar.cc/200?img=68" alt="" width={66} height={66} className="h-full w-full rounded-full border-[2.5px] border-bg object-cover" />
+          <Image src={viewer.avatarUrl} alt="" width={66} height={66} className="h-full w-full rounded-full border-[2.5px] border-bg object-cover" />
           {create.isPending ? (
             <span className="absolute inset-0 grid place-items-center rounded-full bg-black/50">
               <Loader2 className="h-6 w-6 animate-spin text-white" />
@@ -83,6 +91,7 @@ export function StoryRail({ onOpen }: { onOpen: (stories: StoryDTO[], index: num
         </div>
         <span className="max-w-[64px] truncate text-[11.5px] font-medium text-fg-2">Hikayen</span>
       </button>
+      )}
 
       {stories.map((s, i) => (
         <button key={s.id} onClick={() => onOpen(stories, i)} className="flex w-[66px] shrink-0 flex-col items-center gap-1.5">

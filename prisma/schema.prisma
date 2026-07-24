@@ -15,41 +15,42 @@ enum Role {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  username      String    @unique
-  name          String
-  passwordHash  String
-  role          Role      @default(USER)
-  emailVerified DateTime?
-  avatarUrl     String?
+  id               String    @id @default(cuid())
+  email            String    @unique
+  username         String    @unique
+  name             String
+  passwordHash     String
+  role             Role      @default(USER)
+  emailVerified    DateTime?
+  avatarUrl        String?
   // Brute-force / hesap kilitleme
-  failedLoginCount Int      @default(0)
+  failedLoginCount Int       @default(0)
   lockedUntil      DateTime?
   // 2FA
   twoFactorSecret  String?
-  twoFactorEnabled Boolean  @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  twoFactorEnabled Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  sessions           Session[]
-  emailTokens        EmailVerificationToken[]
-  passwordResets     PasswordResetToken[]
-  posts        Post[]      @relation("UserPosts")
-  comments     Comment[]   @relation("UserComments")
-  likes        Like[]      @relation("UserLikes")
-  saves        SavedPost[] @relation("UserSaves")
-  stories      Story[]     @relation("UserStories")
-  storyViews   StoryView[] @relation("UserStoryViews")
-  following    Follow[]    @relation("Following")
-  followers    Follow[]    @relation("Followers")
-  notificationsReceived Notification[] @relation("NotificationsReceived")
-  notificationsSent     Notification[] @relation("NotificationsSent")
+  sessions              Session[]
+  emailTokens           EmailVerificationToken[]
+  passwordResets        PasswordResetToken[]
+  posts                 Post[]                    @relation("UserPosts")
+  comments              Comment[]                 @relation("UserComments")
+  likes                 Like[]                    @relation("UserLikes")
+  saves                 SavedPost[]               @relation("UserSaves")
+  stories               Story[]                   @relation("UserStories")
+  storyViews            StoryView[]               @relation("UserStoryViews")
+  following             Follow[]                  @relation("Following")
+  followers             Follow[]                  @relation("Followers")
+  notificationsReceived Notification[]            @relation("NotificationsReceived")
+  notificationsSent     Notification[]            @relation("NotificationsSent")
   conversationLinks     ConversationParticipant[] @relation("UserConversations")
   sentMessages          Message[]                 @relation("UserMessages")
   commentLikes          CommentLike[]             @relation("UserCommentLikes")
   messageReactions      MessageReaction[]         @relation("UserMessageReactions")
   collections           Collection[]              @relation("UserCollections")
+  highlights            Highlight[]               @relation("UserHighlights")
 
   @@index([email])
   @@index([username])
@@ -57,64 +58,66 @@ model User {
 
 // Kalıcı, dönen (rotating) oturumlar = cihaz oturumları
 model Session {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Refresh token'ın hash'i saklanır (asla düz metin)
-  refreshTokenHash String @unique
+  refreshTokenHash  String    @unique
   // Rotasyon zinciri: yeni oturum bir öncekiyle bağlanır (reuse-detection)
   previousTokenHash String?
   // Cihaz meta verisi
-  userAgent      String?
-  ipAddress      String?
-  deviceLabel    String?
-  rememberMe     Boolean  @default(false)
-  expiresAt      DateTime
-  lastUsedAt     DateTime @default(now())
-  revokedAt      DateTime?
-  createdAt      DateTime @default(now())
+  userAgent         String?
+  ipAddress         String?
+  deviceLabel       String?
+  rememberMe        Boolean   @default(false)
+  expiresAt         DateTime
+  lastUsedAt        DateTime  @default(now())
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
 
   @@index([userId])
   @@index([refreshTokenHash])
 }
 
 model EmailVerificationToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String   @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
 }
 
 model PasswordResetToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String   @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
 }
 
 // Rate limiting / denetim için giriş denemesi kaydı
 model LoginAttempt {
-  id         String   @id @default(cuid())
-  email      String
-  ipAddress  String?
-  success    Boolean
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  email     String
+  ipAddress String?
+  success   Boolean
+  createdAt DateTime @default(now())
 
   @@index([email, createdAt])
   @@index([ipAddress, createdAt])
 }
 
-/* ===================== Sprint 2 — Feed & Post ===================== */
+/**
+ * ===================== Sprint 2 — Feed & Post =====================
+ */
 
 enum MediaType {
   image
@@ -122,15 +125,15 @@ enum MediaType {
 }
 
 model Post {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   authorId     String
-  author       User     @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  author       User      @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
   caption      String
   tags         String[]
   location     String?
-  likeCount    Int      @default(0)
-  commentCount Int      @default(0)
-  createdAt    DateTime @default(now())
+  likeCount    Int       @default(0)
+  commentCount Int       @default(0)
+  createdAt    DateTime  @default(now())
   editedAt     DateTime?
   deletedAt    DateTime?
 
@@ -159,18 +162,18 @@ model Media {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   postId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User     @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
+  author    User          @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
   parentId  String?
-  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
-  replies   Comment[] @relation("CommentReplies")
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]     @relation("CommentReplies")
   text      String
-  likeCount Int      @default(0)
+  likeCount Int           @default(0)
   likes     CommentLike[]
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
   deletedAt DateTime?
 
   @@index([postId, createdAt, id])
@@ -201,15 +204,15 @@ model Like {
 }
 
 model SavedPost {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation("UserSaves", fields: [userId], references: [id], onDelete: Cascade)
-  postId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation("UserSaves", fields: [userId], references: [id], onDelete: Cascade)
+  postId       String
+  post         Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
   // Opsiyonel koleksiyon; koleksiyon silinince kayıt "Tümü"de kalır (SetNull).
   collectionId String?
   collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  createdAt    DateTime    @default(now())
 
   @@unique([userId, postId])
   @@index([userId, createdAt])
@@ -231,12 +234,12 @@ model Collection {
 }
 
 model Story {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   authorId  String
-  author    User     @relation("UserStories", fields: [authorId], references: [id], onDelete: Cascade)
+  author    User        @relation("UserStories", fields: [authorId], references: [id], onDelete: Cascade)
   mediaUrl  String
-  type      MediaType @default(image)
-  createdAt DateTime @default(now())
+  type      MediaType   @default(image)
+  createdAt DateTime    @default(now())
   expiresAt DateTime
   views     StoryView[]
 
@@ -295,10 +298,10 @@ model Notification {
 // Birebir (1:1) doğrudan mesajlaşma. `key` = iki kullanıcı id'sinin sıralı birleşimi
 // ("a:b") — tekilliği garanti eder, find-or-create'i tek sorguya indirir.
 model Conversation {
-  id            String   @id @default(cuid())
-  key           String   @unique
-  createdAt     DateTime @default(now())
-  lastMessageAt DateTime @default(now())
+  id                  String   @id @default(cuid())
+  key                 String   @unique
+  createdAt           DateTime @default(now())
+  lastMessageAt       DateTime @default(now())
   // Liste sorgusunda N+1'i önlemek için son mesaj önizlemesi denormalize edilir.
   lastMessageText     String?
   lastMessageSenderId String?
@@ -335,7 +338,7 @@ model Message {
   imageUrl       String?
   createdAt      DateTime     @default(now())
 
-  reactions      MessageReaction[]
+  reactions MessageReaction[]
 
   @@index([conversationId, createdAt, id])
 }
@@ -351,4 +354,30 @@ model MessageReaction {
 
   @@unique([messageId, userId])
   @@index([messageId])
+}
+
+model Highlight {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation("UserHighlights", fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  createdAt DateTime        @default(now())
+  items     HighlightItem[]
+
+  @@index([userId, createdAt])
+}
+
+model HighlightItem {
+  id          String    @id @default(cuid())
+  highlightId String
+  highlight   Highlight @relation(fields: [highlightId], references: [id], onDelete: Cascade)
+  /// Kaynak hikaye (silinmiş olabilir) — sadece tekrar eklemeyi engellemek için.
+  storyId     String?
+  mediaUrl    String
+  type        MediaType @default(image)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@unique([highlightId, storyId])
+  @@index([highlightId, order])
 }

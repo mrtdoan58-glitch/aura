@@ -4,6 +4,7 @@ import { seedPosts } from "@/server/feed/seed";
 import {
   InMemoryPostRepository, InMemoryLikeRepository, InMemorySaveRepository,
   InMemoryCommentRepository, InMemoryStoryRepository, InMemoryCommentLikeRepository, InMemoryCollectionRepository,
+  InMemoryHighlightRepository,
 } from "@/server/feed/repositories/in-memory";
 import type { Author } from "@/server/feed/domain";
 
@@ -20,6 +21,7 @@ function setup(postCount = 24) {
     comments: new InMemoryCommentRepository(),
     commentLikes: new InMemoryCommentLikeRepository(),
     collections: new InMemoryCollectionRepository(saves),
+    highlights: new InMemoryHighlightRepository(),
     stories: new InMemoryStoryRepository(),
   };
   return { service: new FeedService(deps), deps };
@@ -75,6 +77,7 @@ describe("FeedService — read cache (shared base list, per-viewer enrichment)",
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
       collections: new InMemoryCollectionRepository(saves),
+      highlights: new InMemoryHighlightRepository(),
       stories: new InMemoryStoryRepository(),
       readCache: cache,
     });
@@ -385,6 +388,7 @@ describe("FeedService — stories", () => {
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
       collections: new InMemoryCollectionRepository(saves),
+      highlights: new InMemoryHighlightRepository(),
       stories: new InMemoryStoryRepository(),
       storyRateLimiter: new InMemoryRateLimiter(2, 60_000),
     };
@@ -490,6 +494,7 @@ describe("FeedService — post rate limiting", () => {
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
       collections: new InMemoryCollectionRepository(saves),
+      highlights: new InMemoryHighlightRepository(),
       stories: new InMemoryStoryRepository(),
       postRateLimiter: new InMemoryRateLimiter(2, 60_000),
     };
@@ -515,6 +520,7 @@ describe("FeedService — comment rate limiting", () => {
       comments: new InMemoryCommentRepository(),
       commentLikes: new InMemoryCommentLikeRepository(),
       collections: new InMemoryCollectionRepository(saves),
+      highlights: new InMemoryHighlightRepository(),
       stories: new InMemoryStoryRepository(),
       commentRateLimiter: new InMemoryRateLimiter(3, 60_000),
     };
@@ -524,5 +530,58 @@ describe("FeedService — comment rate limiting", () => {
     await svc.addComment(p.id, AUTHOR, "2");
     await svc.addComment(p.id, AUTHOR, "3");
     await expect(svc.addComment(p.id, AUTHOR, "4")).rejects.toMatchObject({ code: "RATE_LIMITED" });
+  });
+});
+
+describe("FeedService — hikaye vurguları", () => {
+  const OTHER: Author = { id: "other", name: "Öteki", username: "oteki", avatarUrl: "b", verified: false };
+
+  it("vurgu hikayelerin medyasını kopyalar: hikayenin süresi dolsa da öğeler kalır", async () => {
+    const { service, deps } = setup(2);
+    const s1 = await service.createStory(AUTHOR, { mediaUrl: "https://cdn/1.jpg", type: "image" });
+    const s2 = await service.createStory(AUTHOR, { mediaUrl: "https://cdn/2.jpg", type: "image" });
+
+    const h = await service.createHighlight(VIEWER, "  Seyahat  ", [s1.id, s2.id, s1.id]); // tekrar elenir
+    expect(h.title).toBe("Seyahat");
+    expect(h.itemCount).toBe(2);
+    expect(h.coverUrl).toBe("https://cdn/1.jpg");
+
+    // 25 saat sonra hikayeler aktif listede yok, ama vurgu öğeleri duruyor
+    const later = new Date(Date.now() + 25 * 60 * 60 * 1000);
+    expect(await deps.stories.listActive(later, VIEWER)).toHaveLength(0);
+    const detail = await service.getHighlight(h.id);
+    expect(detail.items.map((i) => i.media.url)).toEqual(["https://cdn/1.jpg", "https://cdn/2.jpg"]);
+    expect(detail.userId).toBe(VIEWER);
+  });
+
+  it("başkasının hikayesi vurguya eklenemez ve başkasının vurgusu silinemez", async () => {
+    const { service } = setup(2);
+    const mine = await service.createStory(AUTHOR, { mediaUrl: "https://cdn/mine.jpg", type: "image" });
+    const theirs = await service.createStory(OTHER, { mediaUrl: "https://cdn/theirs.jpg", type: "image" });
+
+    // yalnızca kendi hikayem alınır
+    const h = await service.createHighlight(VIEWER, "Karışık", [mine.id, theirs.id]);
+    const detail = await service.getHighlight(h.id);
+    expect(detail.items.map((i) => i.media.url)).toEqual(["https://cdn/mine.jpg"]);
+
+    // sadece başkasının hikayesiyle vurgu oluşturulamaz
+    await expect(service.createHighlight(VIEWER, "Çalıntı", [theirs.id])).rejects.toThrow(/bulunamadı/i);
+    // başkasının vurgusu silinemez
+    await expect(service.deleteHighlight(OTHER.id, h.id)).rejects.toThrow(/bulunamadı/i);
+    expect(await service.getHighlights(VIEWER)).toHaveLength(1);
+  });
+
+  it("boş ad/boş seçim reddedilir; silince vurgu listeden çıkar", async () => {
+    const { service } = setup(2);
+    const s = await service.createStory(AUTHOR, { mediaUrl: "https://cdn/x.jpg", type: "image" });
+    await expect(service.createHighlight(VIEWER, "   ", [s.id])).rejects.toThrow(/boş olamaz/i);
+    await expect(service.createHighlight(VIEWER, "Ad", [])).rejects.toThrow(/en az bir hikaye/i);
+    await expect(service.createHighlight(VIEWER, "x".repeat(31), [s.id])).rejects.toThrow(/çok uzun/i);
+
+    const h = await service.createHighlight(VIEWER, "Silinecek", [s.id]);
+    expect(await service.getHighlights(VIEWER)).toHaveLength(1);
+    await service.deleteHighlight(VIEWER, h.id);
+    expect(await service.getHighlights(VIEWER)).toHaveLength(0);
+    await expect(service.getHighlight(h.id)).rejects.toThrow(/bulunamadı/i);
   });
 });

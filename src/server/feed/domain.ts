@@ -153,6 +153,39 @@ export interface CollectionRepository {
   ownedBy(collectionId: string, userId: string): Promise<boolean>;
 }
 
+export interface HighlightItem {
+  id: string;
+  /** Kaynak hikaye (süresi dolmuş/silinmiş olabilir) — tekrar eklemeyi engellemek için. */
+  storyId: string | null;
+  media: Media;
+  createdAt: Date;
+}
+
+export interface Highlight {
+  id: string;
+  title: string;
+  coverUrl: string | null;
+  itemCount: number;
+  createdAt: Date;
+}
+
+export interface HighlightDetail extends Highlight {
+  userId: string;
+  items: HighlightItem[];
+}
+
+export interface HighlightRepository {
+  listForUser(userId: string): Promise<Highlight[]>;
+  /** Vurgu + öğeleri (sahibiyle birlikte); yoksa null. */
+  get(highlightId: string): Promise<HighlightDetail | null>;
+  create(
+    userId: string,
+    title: string,
+    items: { storyId: string | null; mediaUrl: string; type: MediaType }[]
+  ): Promise<Highlight>;
+  delete(userId: string, highlightId: string): Promise<void>;
+}
+
 export interface CommentRepository {
   /** Yalnızca üst-seviye yorumlar (parentId=null); her biri replyCount ile. */
   listByPost(postId: string, params: CursorParams): Promise<CursorPage<Comment>>;
@@ -167,6 +200,8 @@ export interface CommentRepository {
 
 export interface StoryRepository {
   listActive(now: Date, viewerId: string | null): Promise<Story[]>;
+  /** Kullanıcının tüm hikayeleri (süresi dolmuşlar dahil) — vurgu arşivi için. */
+  listByAuthor(authorId: string, limit: number): Promise<Story[]>;
   markSeen(storyId: string, viewerId: string): Promise<void>;
   create(data: { author: Author; mediaUrl: string; type: MediaType; expiresAt: Date }): Promise<Story>;
 }

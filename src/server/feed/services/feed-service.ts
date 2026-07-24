@@ -6,6 +6,7 @@
 import type {
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
   CollectionRepository, Collection,
+  HighlightRepository, Highlight, HighlightDetail,
   CursorPage, PostView, Post, Comment, Story, Author, NewPostMedia, MediaType,
 } from "@/server/feed/domain";
 import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
@@ -26,6 +27,7 @@ export interface FeedDeps {
   comments: CommentRepository;
   commentLikes: CommentLikeRepository;
   collections: CollectionRepository;
+  highlights: HighlightRepository;
   stories: StoryRepository;
   commentRateLimiter?: RateLimiter;
   postRateLimiter?: RateLimiter;
@@ -43,6 +45,9 @@ const MAX_CAPTION_LEN = 2200;
 const MAX_MEDIA_COUNT = 10;
 const MAX_TAGS_COUNT = 30;
 const STORY_TTL_MS = 24 * 60 * 60 * 1000; // hikaye 24 saat sonra kaybolur
+const MAX_HIGHLIGHT_TITLE_LEN = 30;
+const MAX_HIGHLIGHT_ITEMS = 30;
+const STORY_ARCHIVE_LIMIT = 60;
 
 export class FeedError extends Error {
   constructor(
@@ -331,5 +336,58 @@ export class FeedService {
     }
     const expiresAt = new Date(this.now().getTime() + STORY_TTL_MS);
     return this.deps.stories.create({ author, mediaUrl: data.mediaUrl, type: data.type, expiresAt });
+  }
+
+  /* --------------------------- Hikaye vurguları --------------------------- */
+
+  /** Kullanıcının kendi hikaye arşivi (süresi dolmuşlar dahil) — vurgu oluştururken seçilir. */
+  async getStoryArchive(viewerId: string): Promise<Story[]> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    return this.deps.stories.listByAuthor(viewerId, STORY_ARCHIVE_LIMIT);
+  }
+
+  /** Bir profilin vurguları (herkese açık). */
+  async getHighlights(userId: string): Promise<Highlight[]> {
+    return this.deps.highlights.listForUser(userId);
+  }
+
+  /** Vurgu detayı (öğeleriyle) — herkese açık. */
+  async getHighlight(highlightId: string): Promise<HighlightDetail> {
+    const h = await this.deps.highlights.get(highlightId);
+    if (!h) throw new FeedError("NOT_FOUND", "Vurgu bulunamadı.");
+    return h;
+  }
+
+  /**
+   * Seçilen hikayelerden vurgu oluşturur. Hikayelerin medyası kopyalanır: hikaye
+   * 24 saat sonra süresi dolsa da vurgu kalıcıdır. Sahiplik, kullanıcının kendi
+   * arşiviyle kesişim alınarak zorlanır — başkasının hikayesi sessizce elenmez,
+   * hiç eşleşme kalmazsa hata verilir.
+   */
+  async createHighlight(viewerId: string, title: string, storyIds: string[]): Promise<Highlight> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    const trimmed = title.trim();
+    if (!trimmed) throw new FeedError("INVALID_INPUT", "Vurgu adı boş olamaz.");
+    if (trimmed.length > MAX_HIGHLIGHT_TITLE_LEN) throw new FeedError("INVALID_INPUT", "Vurgu adı çok uzun.");
+    const unique = [...new Set(storyIds)];
+    if (unique.length === 0) throw new FeedError("INVALID_INPUT", "En az bir hikaye seçmelisin.");
+    if (unique.length > MAX_HIGHLIGHT_ITEMS) throw new FeedError("INVALID_INPUT", "Bir vurguya en fazla 30 hikaye eklenebilir.");
+
+    const own = await this.deps.stories.listByAuthor(viewerId, STORY_ARCHIVE_LIMIT);
+    const byId = new Map(own.map((s) => [s.id, s]));
+    const items = unique
+      .map((id) => byId.get(id))
+      .filter((s): s is Story => !!s)
+      .map((s) => ({ storyId: s.id, mediaUrl: s.media.url, type: s.media.type }));
+    if (items.length === 0) throw new FeedError("NOT_FOUND", "Seçilen hikayeler bulunamadı.");
+
+    return this.deps.highlights.create(viewerId, trimmed, items);
+  }
+
+  async deleteHighlight(viewerId: string, highlightId: string): Promise<void> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    const h = await this.deps.highlights.get(highlightId);
+    if (!h || h.userId !== viewerId) throw new FeedError("NOT_FOUND", "Vurgu bulunamadı.");
+    await this.deps.highlights.delete(viewerId, highlightId);
   }
 }

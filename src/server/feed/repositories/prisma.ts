@@ -9,6 +9,7 @@ import type {
   Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
   PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
   Collection, CollectionRepository,
+  Highlight, HighlightDetail, HighlightRepository,
 } from "@/server/feed/domain";
 import type { Prisma, User } from "@/generated/prisma/client";
 
@@ -458,6 +459,23 @@ export class PrismaStoryRepository implements StoryRepository {
     );
   }
 
+  async listByAuthor(authorId: string, limit: number): Promise<Story[]> {
+    const rows = await prisma.story.findMany({
+      where: { authorId },
+      include: { author: true },
+      orderBy: { createdAt: "desc" },
+      take: Math.min(Math.max(limit, 1), 100),
+    });
+    return rows.map((s) => ({
+      id: s.id,
+      author: toAuthor(s.author),
+      media: { id: s.id, type: s.type, url: s.mediaUrl, posterUrl: null, width: 1080, height: 1350, blurDataUrl: null, order: 0 },
+      createdAt: s.createdAt,
+      expiresAt: s.expiresAt,
+      seenByMe: false,
+    }));
+  }
+
   async markSeen(storyId: string, viewerId: string): Promise<void> {
     await prisma.storyView.upsert({
       where: { storyId_viewerId: { storyId, viewerId } },
@@ -478,6 +496,68 @@ export class PrismaStoryRepository implements StoryRepository {
       expiresAt: row.expiresAt,
       seenByMe: false,
     };
+  }
+}
+
+export class PrismaHighlightRepository implements HighlightRepository {
+  async listForUser(userId: string): Promise<Highlight[]> {
+    const rows = await prisma.highlight.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { items: true } },
+        items: { orderBy: { order: "asc" }, take: 1 }, // kapak: ilk öğe
+      },
+    });
+    return rows.map((h) => ({
+      id: h.id,
+      title: h.title,
+      coverUrl: h.items[0]?.mediaUrl ?? null,
+      itemCount: h._count.items,
+      createdAt: h.createdAt,
+    }));
+  }
+
+  async get(highlightId: string): Promise<HighlightDetail | null> {
+    const h = await prisma.highlight.findUnique({
+      where: { id: highlightId },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
+    if (!h) return null;
+    return {
+      id: h.id,
+      userId: h.userId,
+      title: h.title,
+      coverUrl: h.items[0]?.mediaUrl ?? null,
+      itemCount: h.items.length,
+      createdAt: h.createdAt,
+      items: h.items.map((it) => ({
+        id: it.id,
+        storyId: it.storyId,
+        media: { id: it.id, type: it.type, url: it.mediaUrl, posterUrl: null, width: 1080, height: 1350, blurDataUrl: null, order: it.order },
+        createdAt: it.createdAt,
+      })),
+    };
+  }
+
+  async create(
+    userId: string,
+    title: string,
+    items: { storyId: string | null; mediaUrl: string; type: MediaType }[]
+  ): Promise<Highlight> {
+    const h = await prisma.highlight.create({
+      data: {
+        userId,
+        title,
+        items: { create: items.map((it, i) => ({ storyId: it.storyId, mediaUrl: it.mediaUrl, type: it.type, order: i })) },
+      },
+    });
+    return { id: h.id, title: h.title, coverUrl: items[0]?.mediaUrl ?? null, itemCount: items.length, createdAt: h.createdAt };
+  }
+
+  async delete(userId: string, highlightId: string): Promise<void> {
+    // Öğeler FK ON DELETE CASCADE ile birlikte gider.
+    await prisma.highlight.deleteMany({ where: { id: highlightId, userId } });
   }
 }
 
