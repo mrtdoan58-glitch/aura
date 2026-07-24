@@ -10,6 +10,7 @@ export interface Message {
   conversationId: string;
   senderId: string;
   text: string;
+  imageUrl: string | null;
   createdAt: Date;
 }
 
@@ -45,5 +46,5 @@ export interface ConversationRepository {
 export interface MessageRepository {
   /** Mesajlar (createdAt DESC, id DESC) — istemci gösterirken ters çevirir. */
   list(conversationId: string, params: CursorParams): Promise<CursorPage<Message>>;
-  create(data: { conversationId: string; senderId: string; text: string; now: Date }): Promise<Message>;
+  create(data: { conversationId: string; senderId: string; text: string; imageUrl?: string | null; now: Date }): Promise<Message>;
 }

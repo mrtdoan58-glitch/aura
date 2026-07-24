@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { sendMessageAction } from "@/server/actions/message-actions";
+import { sendMessageAction, sendImageMessageAction } from "@/server/actions/message-actions";
 import type { ThreadDTO } from "@/lib/messaging/types";
 
 async function fetchThread(id: string): Promise<ThreadDTO> {
@@ -18,17 +18,31 @@ export function useThread(id: string) {
     refetchInterval: 5000, // gelen mesajları yakala (websocket yok)
   });
 
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["thread", id] });
+    qc.invalidateQueries({ queryKey: ["conversations"] });
+  };
+
   const send = useMutation({
     mutationFn: async (text: string) => {
       const res = await sendMessageAction(id, text);
       if (!res.ok) throw new Error(res.error ?? "Mesaj gönderilemedi");
       return res.data;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["thread", id] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
-    },
+    onSuccess: invalidate,
   });
 
-  return { query, send };
+  const sendImage = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.set("conversationId", id);
+      fd.set("image", file);
+      const res = await sendImageMessageAction(fd);
+      if (!res.ok) throw new Error(res.error ?? "Fotoğraf gönderilemedi");
+      return res.data;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { query, send, sendImage };
 }

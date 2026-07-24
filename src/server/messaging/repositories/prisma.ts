@@ -65,7 +65,7 @@ export class PrismaConversationRepository implements ConversationRepository {
         const last = await prisma.message.findFirst({
           where: { conversationId: c.id },
           orderBy: { createdAt: "desc" },
-          select: { text: true, senderId: true },
+          select: { text: true, senderId: true, imageUrl: true },
         });
         const lastRead = readMap.get(c.id) ?? new Date(0);
         const unreadCount = await prisma.message.count({
@@ -75,7 +75,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           id: c.id,
           otherUserId,
           lastMessageAt: c.lastMessageAt,
-          lastMessageText: last?.text ?? null,
+          lastMessageText: last ? (last.text || (last.imageUrl ? "📷 Fotoğraf" : "")) : null,
           lastMessageSenderId: last?.senderId ?? null,
           unreadCount,
         };
@@ -135,21 +135,23 @@ export class PrismaMessageRepository implements MessageRepository {
         conversationId: m.conversationId,
         senderId: m.senderId,
         text: m.text,
+        imageUrl: m.imageUrl,
         createdAt: m.createdAt,
       })),
       nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null,
     };
   }
 
-  async create(data: { conversationId: string; senderId: string; text: string; now: Date }): Promise<Message> {
+  async create(data: { conversationId: string; senderId: string; text: string; imageUrl?: string | null; now: Date }): Promise<Message> {
     const m = await prisma.message.create({
       data: {
         conversationId: data.conversationId,
         senderId: data.senderId,
         text: data.text,
+        imageUrl: data.imageUrl ?? null,
         createdAt: data.now,
       },
     });
-    return { id: m.id, conversationId: m.conversationId, senderId: m.senderId, text: m.text, createdAt: m.createdAt };
+    return { id: m.id, conversationId: m.conversationId, senderId: m.senderId, text: m.text, imageUrl: m.imageUrl, createdAt: m.createdAt };
   }
 }

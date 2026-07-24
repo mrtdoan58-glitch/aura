@@ -293,6 +293,7 @@ model Message {
   senderId       String
   sender         User         @relation("UserMessages", fields: [senderId], references: [id], onDelete: Cascade)
   text           String
+  imageUrl       String?
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt, id])

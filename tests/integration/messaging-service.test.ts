@@ -84,6 +84,25 @@ describe("MessagingService — send / list / unread", () => {
   });
 });
 
+describe("MessagingService — image messages", () => {
+  it("sends an image-only message; list preview shows a photo label", async () => {
+    const { service, ALICE, BOB } = setup();
+    const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
+    const m = await service.sendImageMessage(id, ALICE.id, "https://blob/x.jpg");
+    expect(m.imageUrl).toBe("https://blob/x.jpg");
+    expect(m.text).toBe("");
+    const bobList = await service.listConversations(BOB.id);
+    expect(bobList[0].lastMessageText).toBe("📷 Fotoğraf");
+    expect(bobList[0].unreadCount).toBe(1);
+  });
+
+  it("rejects an image message without a url", async () => {
+    const { service, ALICE, BOB } = setup();
+    const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
+    await expect(service.sendImageMessage(id, ALICE.id, "")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});
+
 describe("MessagingService — authorization", () => {
   it("blocks non-participants from reading or writing", async () => {
     const { service, ALICE, BOB, CARA } = setup();

@@ -12,6 +12,7 @@ export interface MessageDTO {
   conversationId: string;
   senderId: string;
   text: string;
+  imageUrl: string | null;
   createdAt: string;
 }
 

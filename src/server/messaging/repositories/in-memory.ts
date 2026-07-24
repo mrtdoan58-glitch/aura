@@ -63,7 +63,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
         id: c.id,
         otherUserId: other?.userId ?? "",
         lastMessageAt: c.lastMessageAt,
-        lastMessageText: last?.text ?? null,
+        lastMessageText: last ? (last.text || (last.imageUrl ? "📷 Fotoğraf" : "")) : null,
         lastMessageSenderId: last?.senderId ?? null,
         unreadCount,
       };
@@ -107,12 +107,13 @@ export class InMemoryMessageRepository implements MessageRepository {
     return { items, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null };
   }
 
-  async create(data: { conversationId: string; senderId: string; text: string; now: Date }): Promise<Message> {
+  async create(data: { conversationId: string; senderId: string; text: string; imageUrl?: string | null; now: Date }): Promise<Message> {
     const message: Message = {
       id: randomUUID(),
       conversationId: data.conversationId,
       senderId: data.senderId,
       text: data.text,
+      imageUrl: data.imageUrl ?? null,
       createdAt: data.now,
     };
     this.store.messages.push(message);

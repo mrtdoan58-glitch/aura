@@ -140,10 +140,22 @@ export class MessagingService {
   }
 
   async sendMessage(conversationId: string, senderId: string, text: string): Promise<Message> {
-    if (!senderId) throw new MessagingError("UNAUTHENTICATED", "Giriş gerekli.");
     const trimmed = text.trim();
     if (!trimmed) throw new MessagingError("INVALID_INPUT", "Mesaj boş olamaz.");
     if (trimmed.length > MAX_TEXT_LEN) throw new MessagingError("INVALID_INPUT", "Mesaj çok uzun.");
+    return this.deliver(conversationId, senderId, trimmed, null);
+  }
+
+  async sendImageMessage(conversationId: string, senderId: string, imageUrl: string, caption = ""): Promise<Message> {
+    if (!imageUrl) throw new MessagingError("INVALID_INPUT", "Geçersiz görsel.");
+    const trimmed = caption.trim();
+    if (trimmed.length > MAX_TEXT_LEN) throw new MessagingError("INVALID_INPUT", "Açıklama çok uzun.");
+    return this.deliver(conversationId, senderId, trimmed, imageUrl);
+  }
+
+  /** Ortak teslim: yetki + rate-limit + oluştur + konuşmayı güncelle + gönderen okundu. */
+  private async deliver(conversationId: string, senderId: string, text: string, imageUrl: string | null): Promise<Message> {
+    if (!senderId) throw new MessagingError("UNAUTHENTICATED", "Giriş gerekli.");
     if (!(await this.deps.conversations.isParticipant(conversationId, senderId)))
       throw new MessagingError("FORBIDDEN", "Bu konuşmaya yazamazsın.");
     if (this.deps.messageRateLimiter) {
@@ -151,7 +163,7 @@ export class MessagingService {
       if (!rl.allowed) throw new MessagingError("RATE_LIMITED", "Çok hızlı mesaj gönderiyorsun. Biraz bekle.");
     }
     const now = this.now();
-    const message = await this.deps.messages.create({ conversationId, senderId, text: trimmed, now });
+    const message = await this.deps.messages.create({ conversationId, senderId, text, imageUrl, now });
     await this.deps.conversations.touch(conversationId, now);
     await this.deps.conversations.markRead(conversationId, senderId, now); // gönderen kendi mesajını okumuş sayılır
     return message;

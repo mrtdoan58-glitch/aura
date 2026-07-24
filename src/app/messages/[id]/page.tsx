@@ -2,8 +2,9 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Send, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Send, BadgeCheck, ImageIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ErrorState } from "@/components/feed/states";
 import { useThread } from "@/hooks/use-thread";
@@ -16,11 +17,18 @@ function clock(iso: string): string {
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { query, send } = useThread(id);
+  const { query, send, sendImage } = useThread(id);
   const [text, setText] = useState("");
   const haptic = useHaptic();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  const pickImage = (file: File | undefined) => {
+    if (!file) return;
+    haptic();
+    sendImage.mutate(file);
+  };
 
   const data = query.data;
   const messages = data ? [...data.messages].reverse() : []; // API DESC → gösterim ASC
@@ -91,12 +99,25 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               <div
                 key={m.id}
                 className={cn(
-                  "max-w-[74%] rounded-[20px] px-4 py-2.5 text-sm leading-snug",
+                  "max-w-[74%] overflow-hidden rounded-[20px] text-sm leading-snug",
+                  m.imageUrl ? "p-1" : "px-4 py-2.5",
                   mine ? "self-end rounded-br-md bg-primary text-white" : "self-start rounded-bl-md bg-surface-2 text-fg"
                 )}
               >
-                {m.text}
-                <div className="mt-1 text-right text-[10.5px] opacity-60">{clock(m.createdAt)}</div>
+                {m.imageUrl && (
+                  <Image
+                    src={m.imageUrl}
+                    alt={m.text || "Fotoğraf"}
+                    width={240}
+                    height={240}
+                    className="h-auto w-full max-w-[240px] rounded-[16px] object-cover"
+                    unoptimized
+                  />
+                )}
+                {m.text && <div className={cn(m.imageUrl && "px-3 pb-1 pt-1.5")}>{m.text}</div>}
+                <div className={cn("text-right text-[10.5px] opacity-60", m.imageUrl ? "px-3 pb-1" : "mt-1")}>
+                  {clock(m.createdAt)}
+                </div>
               </div>
             );
           })
@@ -104,11 +125,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       <div className="glass flex items-center gap-2 border-t border-border px-3.5 pb-6 pt-3">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={sendImage.isPending}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-fg-2 hover:bg-surface-2 disabled:opacity-40"
+          aria-label="Fotoğraf gönder"
+        >
+          <ImageIcon className="h-[22px] w-[22px]" />
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0])} />
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="Mesaj yaz..."
+          placeholder={sendImage.isPending ? "Fotoğraf yükleniyor…" : "Mesaj yaz..."}
           className="flex-1 rounded-full bg-surface-2 px-4 py-3 text-[14.5px] outline-none placeholder:text-fg-3"
         />
         <button
