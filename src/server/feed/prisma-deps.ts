@@ -10,7 +10,7 @@ import { getEnv } from "@/lib/env";
 import { Redis } from "@upstash/redis";
 import {
   PrismaPostRepository, PrismaLikeRepository, PrismaSaveRepository,
-  PrismaCommentRepository, PrismaStoryRepository,
+  PrismaCommentRepository, PrismaStoryRepository, PrismaCommentLikeRepository,
 } from "@/server/feed/repositories/prisma";
 
 function buildCommentRateLimiter(): RateLimiter {
@@ -46,6 +46,7 @@ export function buildPrismaFeedDeps(): FeedDeps {
     likes: new PrismaLikeRepository(),
     saves: new PrismaSaveRepository(),
     comments: new PrismaCommentRepository(),
+    commentLikes: new PrismaCommentLikeRepository(),
     stories: new PrismaStoryRepository(),
     commentRateLimiter: buildCommentRateLimiter(),
     postRateLimiter: buildPostRateLimiter(),

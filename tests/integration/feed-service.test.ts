@@ -3,7 +3,7 @@ import { FeedService } from "@/server/feed/services/feed-service";
 import { seedPosts } from "@/server/feed/seed";
 import {
   InMemoryPostRepository, InMemoryLikeRepository, InMemorySaveRepository,
-  InMemoryCommentRepository, InMemoryStoryRepository,
+  InMemoryCommentRepository, InMemoryStoryRepository, InMemoryCommentLikeRepository,
 } from "@/server/feed/repositories/in-memory";
 import type { Author } from "@/server/feed/domain";
 
@@ -17,6 +17,7 @@ function setup(postCount = 24) {
     likes: new InMemoryLikeRepository(),
     saves: new InMemorySaveRepository(posts),
     comments: new InMemoryCommentRepository(),
+    commentLikes: new InMemoryCommentLikeRepository(),
     stories: new InMemoryStoryRepository(),
   };
   return { service: new FeedService(deps), deps };
@@ -232,6 +233,29 @@ describe("FeedService — comments", () => {
     const parent = await service.addComment(feed[0].id, AUTHOR, "başka gönderide");
     await expect(service.addComment(feed[1].id, AUTHOR, "kaçak yanıt", parent.id)).rejects.toMatchObject({ code: "INVALID_INPUT" });
   });
+
+  it("likes/unlikes a comment (idempotent) and reflects likedByMe", async () => {
+    const { service } = setup(1);
+    const p = (await service.getFeed({ limit: 1 }, VIEWER)).items[0];
+    const c = await service.addComment(p.id, AUTHOR, "beğenilecek yorum");
+
+    await service.setCommentLike(c.id, VIEWER, true);
+    await service.setCommentLike(c.id, VIEWER, true); // idempotent
+    let list = await service.listComments(p.id, { limit: 10 }, VIEWER);
+    let mine = list.items.find((x) => x.id === c.id)!;
+    expect(mine.likeCount).toBe(1);
+    expect(mine.likedByMe).toBe(true);
+
+    // Başka bir izleyici için likedByMe=false
+    const other = await service.listComments(p.id, { limit: 10 }, "someone-else");
+    expect(other.items.find((x) => x.id === c.id)!.likedByMe).toBe(false);
+
+    await service.setCommentLike(c.id, VIEWER, false);
+    list = await service.listComments(p.id, { limit: 10 }, VIEWER);
+    mine = list.items.find((x) => x.id === c.id)!;
+    expect(mine.likeCount).toBe(0);
+    expect(mine.likedByMe).toBe(false);
+  });
 });
 
 describe("FeedService — stories", () => {
@@ -273,6 +297,7 @@ describe("FeedService — stories", () => {
       likes: new InMemoryLikeRepository(),
       saves: new InMemorySaveRepository(posts),
       comments: new InMemoryCommentRepository(),
+      commentLikes: new InMemoryCommentLikeRepository(),
       stories: new InMemoryStoryRepository(),
       storyRateLimiter: new InMemoryRateLimiter(2, 60_000),
     };
@@ -375,6 +400,7 @@ describe("FeedService — post rate limiting", () => {
       likes: new InMemoryLikeRepository(),
       saves: new InMemorySaveRepository(posts),
       comments: new InMemoryCommentRepository(),
+      commentLikes: new InMemoryCommentLikeRepository(),
       stories: new InMemoryStoryRepository(),
       postRateLimiter: new InMemoryRateLimiter(2, 60_000),
     };
@@ -397,6 +423,7 @@ describe("FeedService — comment rate limiting", () => {
       likes: new InMemoryLikeRepository(),
       saves: new InMemorySaveRepository(posts),
       comments: new InMemoryCommentRepository(),
+      commentLikes: new InMemoryCommentLikeRepository(),
       stories: new InMemoryStoryRepository(),
       commentRateLimiter: new InMemoryRateLimiter(3, 60_000),
     };

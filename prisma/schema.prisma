@@ -47,6 +47,7 @@ model User {
   notificationsSent     Notification[] @relation("NotificationsSent")
   conversationLinks     ConversationParticipant[] @relation("UserConversations")
   sentMessages          Message[]                 @relation("UserMessages")
+  commentLikes          CommentLike[]             @relation("UserCommentLikes")
 
   @@index([email])
   @@index([username])
@@ -166,10 +167,23 @@ model Comment {
   replies   Comment[] @relation("CommentReplies")
   text      String
   likeCount Int      @default(0)
+  likes     CommentLike[]
   createdAt DateTime @default(now())
   deletedAt DateTime?
 
   @@index([postId, createdAt, id])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserCommentLikes", fields: [userId], references: [id], onDelete: Cascade)
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, commentId])
+  @@index([commentId])
 }
 
 model Like {

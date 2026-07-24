@@ -50,6 +50,7 @@ export interface Comment {
   text: string;
   likeCount: number;
   replyCount: number;
+  likedByMe: boolean;
   createdAt: Date;
 }
 
@@ -114,6 +115,13 @@ export interface LikeRepository {
   filterLiked(userId: string, postIds: string[]): Promise<Set<string>>;
 }
 
+/** Yorum beğenileri — Post beğenileriyle aynı arayüz (commentId anahtarlı). */
+export interface CommentLikeRepository {
+  add(userId: string, commentId: string): Promise<boolean>;
+  remove(userId: string, commentId: string): Promise<boolean>;
+  filterLiked(userId: string, commentIds: string[]): Promise<Set<string>>;
+}
+
 export interface SaveRepository {
   exists(userId: string, postId: string): Promise<boolean>;
   add(userId: string, postId: string): Promise<boolean>;
@@ -131,6 +139,7 @@ export interface CommentRepository {
   countByPost(postId: string): Promise<number>;
   /** Yorumun ait olduğu post id'si (yanıt doğrulaması için); yoksa null. */
   postIdOf(commentId: string): Promise<string | null>;
+  incrementLikeCount(commentId: string, delta: number): Promise<void>;
 }
 
 export interface StoryRepository {

@@ -4,7 +4,7 @@
  * Beğeni/kaydet toggle'ları idempotent (çift tıklama güvenli) ve sayaçları tutarlı tutar.
  */
 import type {
-  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
+  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
   CursorPage, PostView, Post, Comment, Story, Author, NewPostMedia, MediaType,
 } from "@/server/feed/domain";
 import type { RateLimiter } from "@/server/rate-limit/rate-limiter";
@@ -14,6 +14,7 @@ export interface FeedDeps {
   likes: LikeRepository;
   saves: SaveRepository;
   comments: CommentRepository;
+  commentLikes: CommentLikeRepository;
   stories: StoryRepository;
   commentRateLimiter?: RateLimiter;
   postRateLimiter?: RateLimiter;
@@ -151,13 +152,38 @@ export class FeedService {
   }
 
   /* --------------------------- Yorumlar --------------------------- */
-  async listComments(postId: string, params: { cursor?: string | null; limit?: number }): Promise<CursorPage<Comment>> {
-    return this.deps.comments.listByPost(postId, { cursor: params.cursor, limit: clampLimit(params.limit) });
+  /** Yorum grubuna kullanıcının beğeni durumunu ekler (toplu, N+1 yok). */
+  private async enrichComments(comments: Comment[], viewerId: string | null): Promise<Comment[]> {
+    if (!viewerId || comments.length === 0) return comments.map((c) => ({ ...c, likedByMe: false }));
+    const liked = await this.deps.commentLikes.filterLiked(viewerId, comments.map((c) => c.id));
+    return comments.map((c) => ({ ...c, likedByMe: liked.has(c.id) }));
+  }
+
+  async listComments(
+    postId: string,
+    params: { cursor?: string | null; limit?: number },
+    viewerId: string | null = null
+  ): Promise<CursorPage<Comment>> {
+    const page = await this.deps.comments.listByPost(postId, { cursor: params.cursor, limit: clampLimit(params.limit) });
+    return { ...page, items: await this.enrichComments(page.items, viewerId) };
   }
 
   /** Bir yorumun yanıtları (eskiden yeniye). */
-  async listReplies(parentId: string, limit = 20): Promise<Comment[]> {
-    return this.deps.comments.listReplies(parentId, limit);
+  async listReplies(parentId: string, viewerId: string | null = null, limit = 20): Promise<Comment[]> {
+    const replies = await this.deps.comments.listReplies(parentId, limit);
+    return this.enrichComments(replies, viewerId);
+  }
+
+  async setCommentLike(commentId: string, viewerId: string, liked: boolean): Promise<{ liked: boolean }> {
+    if (!viewerId) throw new FeedError("UNAUTHENTICATED", "Giriş gerekli.");
+    if (liked) {
+      const added = await this.deps.commentLikes.add(viewerId, commentId);
+      if (added) await this.deps.comments.incrementLikeCount(commentId, 1);
+    } else {
+      const removed = await this.deps.commentLikes.remove(viewerId, commentId);
+      if (removed) await this.deps.comments.incrementLikeCount(commentId, -1);
+    }
+    return { liked };
   }
 
   async addComment(postId: string, author: Author, text: string, parentId?: string | null): Promise<Comment> {

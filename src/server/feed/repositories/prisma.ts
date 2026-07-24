@@ -7,7 +7,7 @@ import { prisma } from "@/server/db/prisma";
 import { decodeCursor, encodeCursor } from "@/server/feed/cursor";
 import type {
   Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
-  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
+  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
 } from "@/server/feed/domain";
 import type { Prisma, User } from "@/generated/prisma/client";
 
@@ -289,6 +289,7 @@ export class PrismaCommentRepository implements CommentRepository {
       text: c.text,
       likeCount: c.likeCount,
       replyCount: c._count.replies,
+      likedByMe: false,
       createdAt: c.createdAt,
     }));
     const last = items[items.length - 1];
@@ -310,6 +311,7 @@ export class PrismaCommentRepository implements CommentRepository {
       text: c.text,
       likeCount: c.likeCount,
       replyCount: 0,
+      likedByMe: false,
       createdAt: c.createdAt,
     }));
   }
@@ -326,6 +328,7 @@ export class PrismaCommentRepository implements CommentRepository {
       text: row.text,
       likeCount: row.likeCount,
       replyCount: 0,
+      likedByMe: false,
       createdAt: row.createdAt,
     };
   }
@@ -337,6 +340,33 @@ export class PrismaCommentRepository implements CommentRepository {
   async postIdOf(commentId: string): Promise<string | null> {
     const row = await prisma.comment.findUnique({ where: { id: commentId }, select: { postId: true } });
     return row?.postId ?? null;
+  }
+
+  async incrementLikeCount(commentId: string, delta: number): Promise<void> {
+    await prisma.comment.update({ where: { id: commentId }, data: { likeCount: { increment: delta } } });
+  }
+}
+
+export class PrismaCommentLikeRepository implements CommentLikeRepository {
+  async add(userId: string, commentId: string): Promise<boolean> {
+    try {
+      await prisma.commentLike.create({ data: { userId, commentId } });
+      return true;
+    } catch (e) {
+      if (isUniqueConstraintError(e)) return false;
+      throw e;
+    }
+  }
+  async remove(userId: string, commentId: string): Promise<boolean> {
+    const res = await prisma.commentLike.deleteMany({ where: { userId, commentId } });
+    return res.count > 0;
+  }
+  async filterLiked(userId: string, commentIds: string[]): Promise<Set<string>> {
+    const rows = await prisma.commentLike.findMany({
+      where: { userId, commentId: { in: commentIds } },
+      select: { commentId: true },
+    });
+    return new Set(rows.map((r) => r.commentId));
   }
 }
 

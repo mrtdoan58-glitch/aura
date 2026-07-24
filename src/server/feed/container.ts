@@ -5,7 +5,7 @@
 import { FeedService, type FeedDeps } from "@/server/feed/services/feed-service";
 import {
   InMemoryPostRepository, InMemoryLikeRepository, InMemorySaveRepository,
-  InMemoryCommentRepository, InMemoryStoryRepository,
+  InMemoryCommentRepository, InMemoryStoryRepository, InMemoryCommentLikeRepository,
 } from "@/server/feed/repositories/in-memory";
 import { InMemoryRateLimiter } from "@/server/rate-limit/rate-limiter";
 
@@ -25,6 +25,7 @@ export function buildInMemoryFeedDeps(): FeedDeps {
     likes: new InMemoryLikeRepository(),
     saves: new InMemorySaveRepository(posts),
     comments: new InMemoryCommentRepository(),
+    commentLikes: new InMemoryCommentLikeRepository(),
     stories: new InMemoryStoryRepository(),
     commentRateLimiter: new InMemoryRateLimiter(10, 60 * 1000),
     postRateLimiter: new InMemoryRateLimiter(5, 60 * 60 * 1000),

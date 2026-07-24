@@ -37,6 +37,7 @@ export interface CommentDTO {
   text: string;
   likeCount: number;
   replyCount: number;
+  likedByMe: boolean;
   createdAt: string;
 }
 export interface StoryDTO {

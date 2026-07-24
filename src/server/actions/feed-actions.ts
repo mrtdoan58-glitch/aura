@@ -83,6 +83,18 @@ export async function toggleSaveAction(postId: string, saved: boolean): Promise<
   }
 }
 
+export async function toggleCommentLikeAction(commentId: string, liked: boolean): Promise<ActionResult<{ liked: boolean }>> {
+  const author = await requireAuthor();
+  if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    const res = await getFeedService().setCommentLike(commentId, author.id, liked);
+    return { ok: true, data: res };
+  } catch (e) {
+    if (e instanceof FeedError) return { ok: false, error: e.message, code: e.code };
+    return { ok: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+}
+
 export async function addCommentAction(postId: string, text: string, parentId?: string | null): Promise<ActionResult<CommentDTO>> {
   const author = await requireAuthor();
   if (!author) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };

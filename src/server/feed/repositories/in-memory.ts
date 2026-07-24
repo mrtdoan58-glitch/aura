@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   Post, Comment, Story, Author, CursorParams, CursorPage, NewPostMedia, MediaType,
-  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository,
+  PostRepository, LikeRepository, SaveRepository, CommentRepository, StoryRepository, CommentLikeRepository,
 } from "@/server/feed/domain";
 import { encodeCursor, decodeCursor, isAfterCursor } from "@/server/feed/cursor";
 import { seedPosts, seedStories } from "@/server/feed/seed";
@@ -174,6 +174,7 @@ export class InMemoryCommentRepository implements CommentRepository {
       text: data.text,
       likeCount: 0,
       replyCount: 0,
+      likedByMe: false,
       createdAt: new Date(),
     };
     this.comments.push(comment);
@@ -184,6 +185,16 @@ export class InMemoryCommentRepository implements CommentRepository {
   }
   async postIdOf(commentId: string): Promise<string | null> {
     return this.comments.find((c) => c.id === commentId)?.postId ?? null;
+  }
+  async incrementLikeCount(commentId: string, delta: number) {
+    const c = this.comments.find((x) => x.id === commentId);
+    if (c) c.likeCount = Math.max(0, c.likeCount + delta);
+  }
+}
+
+export class InMemoryCommentLikeRepository extends RelationRepo implements CommentLikeRepository {
+  async filterLiked(userId: string, commentIds: string[]) {
+    return this.filter(userId, commentIds);
   }
 }
 

@@ -2,15 +2,16 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Send, Loader2, X } from "lucide-react";
+import { Send, Loader2, X, Heart } from "lucide-react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useComments } from "@/hooks/use-comments";
 import { useReplies } from "@/hooks/use-replies";
-import { addCommentAction } from "@/server/actions/feed-actions";
+import { addCommentAction, toggleCommentLikeAction } from "@/server/actions/feed-actions";
 import type { CommentDTO, CursorPageDTO } from "@/lib/feed/types";
 import { Avatar } from "@/components/ui/avatar";
 import { relativeTime } from "@/lib/feed/format";
 import { EmptyState } from "@/components/feed/states";
+import { cn } from "@/lib/utils";
 
 type CommentsData = InfiniteData<CursorPageDTO<CommentDTO>>;
 type RepliesData = { items: CommentDTO[] };
@@ -157,6 +158,7 @@ function CommentRow({
           </p>
           <div className="mt-0.5 flex items-center gap-3 text-[11.5px] text-fg-3">
             <span>{relativeTime(c.createdAt)}</span>
+            <CommentLikeButton comment={c} disabled={!canComment} />
             {canComment && (
               <button onClick={() => onReply({ id: c.id, username: c.author.username })} className="font-semibold hover:text-fg-2">
                 Yanıtla
@@ -187,7 +189,10 @@ function CommentRow({
                         </Link>
                         {r.text}
                       </p>
-                      <span className="text-[11px] text-fg-3">{relativeTime(r.createdAt)}</span>
+                      <div className="flex items-center gap-3 text-[11px] text-fg-3">
+                        <span>{relativeTime(r.createdAt)}</span>
+                        <CommentLikeButton comment={r} disabled={!canComment} />
+                      </div>
                     </div>
                   </div>
                 ))
@@ -197,6 +202,38 @@ function CommentRow({
         </div>
       </div>
     </div>
+  );
+}
+
+function CommentLikeButton({ comment, disabled }: { comment: CommentDTO; disabled: boolean }) {
+  const [liked, setLiked] = useState(comment.likedByMe);
+  const [count, setCount] = useState(comment.likeCount);
+  const [pending, startTransition] = useTransition();
+
+  const toggle = () => {
+    if (disabled) return;
+    const next = !liked;
+    setLiked(next);
+    setCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    startTransition(async () => {
+      const res = await toggleCommentLikeAction(comment.id, next);
+      if (!res.ok) {
+        setLiked(!next);
+        setCount((c) => Math.max(0, c + (next ? -1 : 1)));
+      }
+    });
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={disabled || pending}
+      className={cn("flex items-center gap-1 font-semibold hover:text-fg-2 disabled:hover:text-fg-3", liked && "text-danger hover:text-danger")}
+      aria-label={liked ? "Beğeniyi geri al" : "Beğen"}
+    >
+      <Heart className={cn("h-3.5 w-3.5", liked && "fill-danger")} />
+      {count > 0 && <span>{count}</span>}
+    </button>
   );
 }
 
