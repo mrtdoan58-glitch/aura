@@ -4,7 +4,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type {
-  ConversationRepository, MessageRepository, ConversationSummary, Message,
+  ConversationRepository, MessageRepository, ConversationSummary, Message, ReactionRepository, ReactionSummary,
 } from "@/server/messaging/domain";
 import type { CursorParams, CursorPage } from "@/server/feed/domain";
 import { encodeCursor, decodeCursor, isAfterCursor } from "@/server/feed/cursor";
@@ -24,11 +24,18 @@ interface ParticipantRow {
   unreadCount: number;
 }
 
-/** İki repo'nun paylaştığı bellek deposu. */
+interface ReactionRow {
+  messageId: string;
+  userId: string;
+  emoji: string;
+}
+
+/** Repoların paylaştığı bellek deposu. */
 export class InMemoryMessagingStore {
   conversations: ConversationRow[] = [];
   participants: ParticipantRow[] = [];
   messages: Message[] = [];
+  reactions: ReactionRow[] = [];
 }
 
 export class InMemoryConversationRepository implements ConversationRepository {
@@ -127,9 +134,45 @@ export class InMemoryMessageRepository implements MessageRepository {
       senderId: data.senderId,
       text: data.text,
       imageUrl: data.imageUrl ?? null,
+      reactions: [],
       createdAt: data.now,
     };
     this.store.messages.push(message);
     return message;
+  }
+
+  async conversationIdOf(messageId: string): Promise<string | null> {
+    return this.store.messages.find((m) => m.id === messageId)?.conversationId ?? null;
+  }
+}
+
+export class InMemoryReactionRepository implements ReactionRepository {
+  constructor(private readonly store: InMemoryMessagingStore) {}
+
+  async set(messageId: string, userId: string, emoji: string): Promise<void> {
+    const existing = this.store.reactions.find((r) => r.messageId === messageId && r.userId === userId);
+    if (existing) existing.emoji = emoji;
+    else this.store.reactions.push({ messageId, userId, emoji });
+  }
+
+  async remove(messageId: string, userId: string): Promise<void> {
+    this.store.reactions = this.store.reactions.filter((r) => !(r.messageId === messageId && r.userId === userId));
+  }
+
+  async listForMessages(messageIds: string[], viewerId: string | null): Promise<Record<string, ReactionSummary[]>> {
+    const out: Record<string, ReactionSummary[]> = {};
+    for (const id of messageIds) {
+      const rows = this.store.reactions.filter((r) => r.messageId === id);
+      const byEmoji = new Map<string, { count: number; mine: boolean }>();
+      for (const r of rows) {
+        const cur = byEmoji.get(r.emoji) ?? { count: 0, mine: false };
+        cur.count += 1;
+        if (viewerId && r.userId === viewerId) cur.mine = true;
+        byEmoji.set(r.emoji, cur);
+      }
+      const summaries = [...byEmoji.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine }));
+      if (summaries.length > 0) out[id] = summaries;
+    }
+    return out;
   }
 }

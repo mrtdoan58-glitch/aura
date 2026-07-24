@@ -70,6 +70,17 @@ export async function sendImageMessageAction(formData: FormData): Promise<Action
   }
 }
 
+export async function reactToMessageAction(messageId: string, emoji: string | null): Promise<ActionResult<null>> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };
+  try {
+    await getMessagingService().reactToMessage(messageId, user.id, emoji);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function markConversationReadAction(conversationId: string): Promise<ActionResult<null>> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Giriş gerekli.", code: "UNAUTHENTICATED" };

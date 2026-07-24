@@ -48,6 +48,7 @@ model User {
   conversationLinks     ConversationParticipant[] @relation("UserConversations")
   sentMessages          Message[]                 @relation("UserMessages")
   commentLikes          CommentLike[]             @relation("UserCommentLikes")
+  messageReactions      MessageReaction[]         @relation("UserMessageReactions")
 
   @@index([email])
   @@index([username])
@@ -315,5 +316,20 @@ model Message {
   imageUrl       String?
   createdAt      DateTime     @default(now())
 
+  reactions      MessageReaction[]
+
   @@index([conversationId, createdAt, id])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("UserMessageReactions", fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([messageId])
 }

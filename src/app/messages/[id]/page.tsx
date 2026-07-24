@@ -4,12 +4,14 @@ import { Fragment, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Send, BadgeCheck, ImageIcon } from "lucide-react";
+import { ArrowLeft, Send, BadgeCheck, ImageIcon, SmilePlus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ErrorState } from "@/components/feed/states";
 import { useThread } from "@/hooks/use-thread";
 import { useHaptic } from "@/hooks/use-haptic";
 import { cn } from "@/lib/utils";
+
+const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
 
 function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
@@ -17,12 +19,19 @@ function clock(iso: string): string {
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { query, send, sendImage } = useThread(id);
+  const { query, send, sendImage, react } = useThread(id);
   const [text, setText] = useState("");
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
   const haptic = useHaptic();
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  const applyReaction = (messageId: string, emoji: string, alreadyMine: boolean) => {
+    haptic();
+    setPickerFor(null);
+    react.mutate({ messageId, emoji: alreadyMine ? null : emoji });
+  };
 
   const pickImage = (file: File | undefined) => {
     if (!file) return;
@@ -106,28 +115,74 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             const mine = data ? m.senderId !== data.otherUser.id : false;
             return (
               <Fragment key={m.id}>
-              <div
-                className={cn(
-                  "max-w-[74%] overflow-hidden rounded-[20px] text-sm leading-snug",
-                  m.imageUrl ? "p-1" : "px-4 py-2.5",
-                  mine ? "self-end rounded-br-md bg-primary text-white" : "self-start rounded-bl-md bg-surface-2 text-fg"
-                )}
-              >
-                {m.imageUrl && (
-                  <Image
-                    src={m.imageUrl}
-                    alt={m.text || "Fotoğraf"}
-                    width={240}
-                    height={240}
-                    className="h-auto w-full max-w-[240px] rounded-[16px] object-cover"
-                    unoptimized
-                  />
-                )}
-                {m.text && <div className={cn(m.imageUrl && "px-3 pb-1 pt-1.5")}>{m.text}</div>}
-                <div className={cn("text-right text-[10.5px] opacity-60", m.imageUrl ? "px-3 pb-1" : "mt-1")}>
-                  {clock(m.createdAt)}
+              <div className={cn("group flex max-w-[86%] items-center gap-1.5", mine ? "flex-row-reverse self-end" : "self-start")}>
+                <div
+                  className={cn(
+                    "overflow-hidden rounded-[20px] text-sm leading-snug",
+                    m.imageUrl ? "p-1" : "px-4 py-2.5",
+                    mine ? "rounded-br-md bg-primary text-white" : "rounded-bl-md bg-surface-2 text-fg"
+                  )}
+                >
+                  {m.imageUrl && (
+                    <Image
+                      src={m.imageUrl}
+                      alt={m.text || "Fotoğraf"}
+                      width={240}
+                      height={240}
+                      className="h-auto w-full max-w-[240px] rounded-[16px] object-cover"
+                      unoptimized
+                    />
+                  )}
+                  {m.text && <div className={cn(m.imageUrl && "px-3 pb-1 pt-1.5")}>{m.text}</div>}
+                  <div className={cn("text-right text-[10.5px] opacity-60", m.imageUrl ? "px-3 pb-1" : "mt-1")}>
+                    {clock(m.createdAt)}
+                  </div>
                 </div>
+                <button
+                  onClick={() => setPickerFor((v) => (v === m.id ? null : m.id))}
+                  className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-fg-2 focus:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100"
+                  aria-label="Tepki ver"
+                  aria-expanded={pickerFor === m.id}
+                >
+                  <SmilePlus className="h-[18px] w-[18px]" />
+                </button>
               </div>
+
+              {pickerFor === m.id && (
+                <div className={cn("flex gap-0.5 rounded-full border border-border bg-bg px-2 py-1 shadow-md", mine ? "self-end" : "self-start")}>
+                  {REACTIONS.map((e) => {
+                    const alreadyMine = m.reactions.find((r) => r.emoji === e)?.mine ?? false;
+                    return (
+                      <button
+                        key={e}
+                        onClick={() => applyReaction(m.id, e, alreadyMine)}
+                        className={cn("rounded-full px-1 text-[19px] transition-transform hover:scale-125", alreadyMine && "bg-primary/15")}
+                      >
+                        {e}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {m.reactions.length > 0 && (
+                <div className={cn("-mt-1 flex flex-wrap gap-1", mine ? "self-end" : "self-start")}>
+                  {m.reactions.map((r) => (
+                    <button
+                      key={r.emoji}
+                      onClick={() => applyReaction(m.id, r.emoji, r.mine)}
+                      className={cn(
+                        "flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[12px]",
+                        r.mine ? "border-primary bg-primary/10" : "border-border bg-surface-2"
+                      )}
+                    >
+                      <span>{r.emoji}</span>
+                      <span className="font-semibold text-fg-2">{r.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {m.id === lastSeenMineId && (
                 <div className="-mt-1 self-end pr-1 text-[10.5px] font-medium text-fg-3">Görüldü</div>
               )}

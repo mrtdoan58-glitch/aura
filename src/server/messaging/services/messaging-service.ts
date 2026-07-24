@@ -7,6 +7,7 @@ import {
   conversationKey,
   type ConversationRepository,
   type MessageRepository,
+  type ReactionRepository,
   type Message,
 } from "@/server/messaging/domain";
 import type { User } from "@/server/auth/domain";
@@ -32,10 +33,14 @@ export interface UserDirectory {
 export interface MessagingDeps {
   conversations: ConversationRepository;
   messages: MessageRepository;
+  reactions: ReactionRepository;
   users: UserDirectory;
   messageRateLimiter?: RateLimiter;
   now?: () => Date;
 }
+
+/** DM mesajlarında izin verilen tepki emojileri. */
+export const ALLOWED_REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
 
 export interface ConversationView {
   id: string;
@@ -137,9 +142,12 @@ export class MessagingService {
     });
     // Karşı tarafın okuma durumu (viewer'ın kendi markRead'inden etkilenmez).
     const otherLastReadAt = await this.deps.conversations.otherLastReadAt(conversationId, userId);
+    // Tepkileri toplu çek (tek sorgu, N+1 yok) ve mesajlara ekle.
+    const reactionMap = await this.deps.reactions.listForMessages(page.items.map((m) => m.id), userId);
+    const messages = page.items.map((m) => ({ ...m, reactions: reactionMap[m.id] ?? [] }));
     // Konuşmayı açmak = okumak: okundu işaretle.
     await this.deps.conversations.markRead(conversationId, userId, this.now());
-    return { id: conversationId, otherUser: toUserInfo(other), messages: page.items, nextCursor: page.nextCursor, otherLastReadAt };
+    return { id: conversationId, otherUser: toUserInfo(other), messages, nextCursor: page.nextCursor, otherLastReadAt };
   }
 
   async sendMessage(conversationId: string, senderId: string, text: string): Promise<Message> {
@@ -171,6 +179,21 @@ export class MessagingService {
     await this.deps.conversations.recordMessage(conversationId, senderId, preview, now);
     await this.deps.conversations.markRead(conversationId, senderId, now); // gönderen okumuş sayılır (unread 0)
     return message;
+  }
+
+  /** Bir mesaja emoji tepkisi ekle/değiştir (emoji) ya da kaldır (null). */
+  async reactToMessage(messageId: string, userId: string, emoji: string | null): Promise<void> {
+    if (!userId) throw new MessagingError("UNAUTHENTICATED", "Giriş gerekli.");
+    const conversationId = await this.deps.messages.conversationIdOf(messageId);
+    if (!conversationId) throw new MessagingError("NOT_FOUND", "Mesaj bulunamadı.");
+    if (!(await this.deps.conversations.isParticipant(conversationId, userId)))
+      throw new MessagingError("FORBIDDEN", "Bu mesaja tepki veremezsin.");
+    if (emoji === null) {
+      await this.deps.reactions.remove(messageId, userId);
+      return;
+    }
+    if (!ALLOWED_REACTIONS.includes(emoji)) throw new MessagingError("INVALID_INPUT", "Geçersiz tepki.");
+    await this.deps.reactions.set(messageId, userId, emoji);
   }
 
   /** Konuşmayı okundu işaretle (istemci thread'i açtığında/odakladığında). */

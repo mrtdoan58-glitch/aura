@@ -7,7 +7,7 @@ import { InMemoryRateLimiter, type RateLimiter } from "@/server/rate-limit/rate-
 import { RedisRateLimiter } from "@/server/rate-limit/redis-rate-limiter";
 import { getEnv } from "@/lib/env";
 import { Redis } from "@upstash/redis";
-import { PrismaConversationRepository, PrismaMessageRepository } from "@/server/messaging/repositories/prisma";
+import { PrismaConversationRepository, PrismaMessageRepository, PrismaReactionRepository } from "@/server/messaging/repositories/prisma";
 import { getAuthService } from "@/server/auth/container";
 
 function buildMessageRateLimiter(): RateLimiter {
@@ -23,6 +23,7 @@ export function buildPrismaMessagingDeps(): MessagingDeps {
   return {
     conversations: new PrismaConversationRepository(),
     messages: new PrismaMessageRepository(),
+    reactions: new PrismaReactionRepository(),
     users: getAuthService(),
     messageRateLimiter: buildMessageRateLimiter(),
   };

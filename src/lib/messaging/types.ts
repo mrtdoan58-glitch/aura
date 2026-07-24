@@ -7,12 +7,19 @@ export interface UserInfoDTO {
   verified: boolean;
 }
 
+export interface ReactionSummaryDTO {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
 export interface MessageDTO {
   id: string;
   conversationId: string;
   senderId: string;
   text: string;
   imageUrl: string | null;
+  reactions: ReactionSummaryDTO[];
   createdAt: string;
 }
 

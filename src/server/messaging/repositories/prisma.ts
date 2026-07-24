@@ -6,7 +6,7 @@
 import { prisma } from "@/server/db/prisma";
 import { decodeCursor, encodeCursor } from "@/server/feed/cursor";
 import type {
-  ConversationRepository, MessageRepository, ConversationSummary, Message,
+  ConversationRepository, MessageRepository, ConversationSummary, Message, ReactionRepository, ReactionSummary,
 } from "@/server/messaging/domain";
 import type { CursorParams, CursorPage } from "@/server/feed/domain";
 
@@ -138,6 +138,7 @@ export class PrismaMessageRepository implements MessageRepository {
         senderId: m.senderId,
         text: m.text,
         imageUrl: m.imageUrl,
+        reactions: [],
         createdAt: m.createdAt,
       })),
       nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null,
@@ -154,6 +155,46 @@ export class PrismaMessageRepository implements MessageRepository {
         createdAt: data.now,
       },
     });
-    return { id: m.id, conversationId: m.conversationId, senderId: m.senderId, text: m.text, imageUrl: m.imageUrl, createdAt: m.createdAt };
+    return { id: m.id, conversationId: m.conversationId, senderId: m.senderId, text: m.text, imageUrl: m.imageUrl, reactions: [], createdAt: m.createdAt };
+  }
+
+  async conversationIdOf(messageId: string): Promise<string | null> {
+    const row = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true } });
+    return row?.conversationId ?? null;
+  }
+}
+
+export class PrismaReactionRepository implements ReactionRepository {
+  async set(messageId: string, userId: string, emoji: string): Promise<void> {
+    await prisma.messageReaction.upsert({
+      where: { messageId_userId: { messageId, userId } },
+      create: { messageId, userId, emoji },
+      update: { emoji },
+    });
+  }
+
+  async remove(messageId: string, userId: string): Promise<void> {
+    await prisma.messageReaction.deleteMany({ where: { messageId, userId } });
+  }
+
+  async listForMessages(messageIds: string[], viewerId: string | null): Promise<Record<string, ReactionSummary[]>> {
+    if (messageIds.length === 0) return {};
+    const rows = await prisma.messageReaction.findMany({
+      where: { messageId: { in: messageIds } },
+      select: { messageId: true, emoji: true, userId: true },
+    });
+    const out: Record<string, Map<string, { count: number; mine: boolean }>> = {};
+    for (const r of rows) {
+      const byEmoji = (out[r.messageId] ??= new Map());
+      const cur = byEmoji.get(r.emoji) ?? { count: 0, mine: false };
+      cur.count += 1;
+      if (viewerId && r.userId === viewerId) cur.mine = true;
+      byEmoji.set(r.emoji, cur);
+    }
+    const result: Record<string, ReactionSummary[]> = {};
+    for (const [messageId, byEmoji] of Object.entries(out)) {
+      result[messageId] = [...byEmoji.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine }));
+    }
+    return result;
   }
 }

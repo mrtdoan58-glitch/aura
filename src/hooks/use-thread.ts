@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { sendMessageAction, sendImageMessageAction } from "@/server/actions/message-actions";
+import { sendMessageAction, sendImageMessageAction, reactToMessageAction } from "@/server/actions/message-actions";
 import type { ThreadDTO } from "@/lib/messaging/types";
 
 async function fetchThread(id: string): Promise<ThreadDTO> {
@@ -44,5 +44,13 @@ export function useThread(id: string) {
     onSuccess: invalidate,
   });
 
-  return { query, send, sendImage };
+  const react = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string | null }) => {
+      const res = await reactToMessageAction(messageId, emoji);
+      if (!res.ok) throw new Error(res.error ?? "Tepki verilemedi");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["thread", id] }),
+  });
+
+  return { query, send, sendImage, react };
 }

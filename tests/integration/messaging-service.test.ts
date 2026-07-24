@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessagingService } from "@/server/messaging/services/messaging-service";
 import {
-  InMemoryMessagingStore, InMemoryConversationRepository, InMemoryMessageRepository,
+  InMemoryMessagingStore, InMemoryConversationRepository, InMemoryMessageRepository, InMemoryReactionRepository,
 } from "@/server/messaging/repositories/in-memory";
 import type { User } from "@/server/auth/domain";
 
@@ -25,6 +25,7 @@ function setup() {
   const service = new MessagingService({
     conversations: new InMemoryConversationRepository(store),
     messages: new InMemoryMessageRepository(store),
+    reactions: new InMemoryReactionRepository(store),
     users: {
       getUserById: async (id) => byId.get(id) ?? null,
       getUserByUsername: async (un) => byName.get(un) ?? null,
@@ -128,6 +129,38 @@ describe("MessagingService — image messages", () => {
     const { service, ALICE, BOB } = setup();
     const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
     await expect(service.sendImageMessage(id, ALICE.id, "")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});
+
+describe("MessagingService — reactions", () => {
+  it("adds, changes and removes a reaction; enriches the thread with counts/mine", async () => {
+    const { service, ALICE, BOB } = setup();
+    const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
+    const msg = await service.sendMessage(id, ALICE.id, "tepki ver");
+
+    await service.reactToMessage(msg.id, BOB.id, "❤️");
+    let thread = await service.getThread(id, BOB.id, {});
+    let m = thread.messages.find((x) => x.id === msg.id)!;
+    expect(m.reactions).toEqual([{ emoji: "❤️", count: 1, mine: true }]);
+
+    // Aynı kullanıcı emojiyi değiştirir (tek tepki kalır)
+    await service.reactToMessage(msg.id, BOB.id, "😂");
+    thread = await service.getThread(id, ALICE.id, {}); // Alice bakıyor → mine=false
+    m = thread.messages.find((x) => x.id === msg.id)!;
+    expect(m.reactions).toEqual([{ emoji: "😂", count: 1, mine: false }]);
+
+    // Kaldır
+    await service.reactToMessage(msg.id, BOB.id, null);
+    thread = await service.getThread(id, BOB.id, {});
+    expect(thread.messages.find((x) => x.id === msg.id)!.reactions).toEqual([]);
+  });
+
+  it("rejects an invalid emoji and non-participants", async () => {
+    const { service, ALICE, BOB, CARA } = setup();
+    const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
+    const msg = await service.sendMessage(id, ALICE.id, "x");
+    await expect(service.reactToMessage(msg.id, BOB.id, "🚀")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    await expect(service.reactToMessage(msg.id, CARA.id, "❤️")).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
 

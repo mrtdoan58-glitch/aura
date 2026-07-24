@@ -6,7 +6,7 @@
  */
 import { MessagingService, type MessagingDeps } from "@/server/messaging/services/messaging-service";
 import {
-  InMemoryMessagingStore, InMemoryConversationRepository, InMemoryMessageRepository,
+  InMemoryMessagingStore, InMemoryConversationRepository, InMemoryMessageRepository, InMemoryReactionRepository,
 } from "@/server/messaging/repositories/in-memory";
 import { getAuthService } from "@/server/auth/container";
 import { InMemoryRateLimiter } from "@/server/rate-limit/rate-limiter";
@@ -23,6 +23,7 @@ export function buildInMemoryMessagingDeps(): MessagingDeps {
   return {
     conversations: new InMemoryConversationRepository(store),
     messages: new InMemoryMessageRepository(store),
+    reactions: new InMemoryReactionRepository(store),
     users: getAuthService(),
     messageRateLimiter: new InMemoryRateLimiter(30, 60 * 1000),
   };
