@@ -279,6 +279,9 @@ model Conversation {
   key           String   @unique
   createdAt     DateTime @default(now())
   lastMessageAt DateTime @default(now())
+  // Liste sorgusunda N+1'i önlemek için son mesaj önizlemesi denormalize edilir.
+  lastMessageText     String?
+  lastMessageSenderId String?
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -295,6 +298,8 @@ model ConversationParticipant {
   userId         String
   user           User         @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
   lastReadAt     DateTime     @default(now())
+  // Denormalize okunmamış sayacı: yeni mesajda alıcıda +1, okununca 0'a resetlenir.
+  unreadCount    Int          @default(0)
 
   @@unique([conversationId, userId])
   @@index([userId])

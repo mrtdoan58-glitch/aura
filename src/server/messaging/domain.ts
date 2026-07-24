@@ -39,9 +39,12 @@ export interface ConversationRepository {
   otherUserId(conversationId: string, userId: string): Promise<string | null>;
   /** Karşı katılımcının lastReadAt'i (okundu bilgisi için). */
   otherLastReadAt(conversationId: string, userId: string): Promise<Date | null>;
-  /** lastMessageAt güncelle (yeni mesajda). */
-  touch(conversationId: string, at: Date): Promise<void>;
-  /** Kullanıcının lastReadAt'ini güncelle. */
+  /**
+   * Yeni mesajı kaydet: lastMessageAt/önizleme'yi denormalize et ve KARŞI
+   * katılımcıların okunmamış sayacını +1 yap (gönderen hariç).
+   */
+  recordMessage(conversationId: string, senderId: string, preview: string, at: Date): Promise<void>;
+  /** Kullanıcının lastReadAt'ini güncelle ve okunmamış sayacını 0'a resetle. */
   markRead(conversationId: string, userId: string, at: Date): Promise<void>;
 }
 

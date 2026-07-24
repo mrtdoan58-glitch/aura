@@ -84,6 +84,21 @@ describe("MessagingService — send / list / unread", () => {
     expect(after.otherLastReadAt!.getTime()).toBeGreaterThanOrEqual(msg.createdAt.getTime());
   });
 
+  it("unread counter resets on read and re-accumulates on new messages", async () => {
+    const { service, ALICE, BOB } = setup();
+    const id = await service.getOrCreateConversation(ALICE.id, BOB.id);
+    await service.sendMessage(id, ALICE.id, "1");
+    expect((await service.listConversations(BOB.id))[0].unreadCount).toBe(1);
+    await service.getThread(id, BOB.id, {}); // Bob okur → 0
+    expect((await service.listConversations(BOB.id))[0].unreadCount).toBe(0);
+    await service.sendMessage(id, ALICE.id, "2"); // yeni mesaj → tekrar 1
+    await service.sendMessage(id, ALICE.id, "3"); // → 2
+    const bob = (await service.listConversations(BOB.id))[0];
+    expect(bob.unreadCount).toBe(2);
+    expect(bob.lastMessageText).toBe("3");
+    expect(bob.lastMessageMine).toBe(false);
+  });
+
   it("opening the thread marks it read", async () => {
     const { service, ALICE, BOB } = setup();
     const id = await service.getOrCreateConversation(ALICE.id, BOB.id);

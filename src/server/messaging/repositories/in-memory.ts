@@ -14,11 +14,14 @@ interface ConversationRow {
   key: string;
   createdAt: Date;
   lastMessageAt: Date;
+  lastMessageText: string | null;
+  lastMessageSenderId: string | null;
 }
 interface ParticipantRow {
   conversationId: string;
   userId: string;
   lastReadAt: Date;
+  unreadCount: number;
 }
 
 /** İki repo'nun paylaştığı bellek deposu. */
@@ -37,35 +40,29 @@ export class InMemoryConversationRepository implements ConversationRepository {
 
   async create(key: string, userA: string, userB: string, now: Date): Promise<string> {
     const id = randomUUID();
-    this.store.conversations.push({ id, key, createdAt: now, lastMessageAt: now });
-    this.store.participants.push({ conversationId: id, userId: userA, lastReadAt: now });
-    this.store.participants.push({ conversationId: id, userId: userB, lastReadAt: now });
+    this.store.conversations.push({ id, key, createdAt: now, lastMessageAt: now, lastMessageText: null, lastMessageSenderId: null });
+    this.store.participants.push({ conversationId: id, userId: userA, lastReadAt: now, unreadCount: 0 });
+    this.store.participants.push({ conversationId: id, userId: userB, lastReadAt: now, unreadCount: 0 });
     return id;
   }
 
   async listForUser(userId: string): Promise<ConversationSummary[]> {
-    const myConvIds = this.store.participants
-      .filter((p) => p.userId === userId)
-      .map((p) => p.conversationId);
+    const mineByConv = new Map(
+      this.store.participants.filter((p) => p.userId === userId).map((p) => [p.conversationId, p])
+    );
     const rows = this.store.conversations
-      .filter((c) => myConvIds.includes(c.id))
+      .filter((c) => mineByConv.has(c.id))
       .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+    // Denormalize alanlar sayesinde konuşma başına ek sorgu YOK.
     return rows.map((c) => {
       const other = this.store.participants.find((p) => p.conversationId === c.id && p.userId !== userId);
-      const mine = this.store.participants.find((p) => p.conversationId === c.id && p.userId === userId);
-      const msgs = this.store.messages
-        .filter((m) => m.conversationId === c.id)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      const last = msgs[0] ?? null;
-      const lastRead = mine?.lastReadAt ?? new Date(0);
-      const unreadCount = msgs.filter((m) => m.senderId !== userId && m.createdAt > lastRead).length;
       return {
         id: c.id,
         otherUserId: other?.userId ?? "",
         lastMessageAt: c.lastMessageAt,
-        lastMessageText: last ? (last.text || (last.imageUrl ? "📷 Fotoğraf" : "")) : null,
-        lastMessageSenderId: last?.senderId ?? null,
-        unreadCount,
+        lastMessageText: c.lastMessageText,
+        lastMessageSenderId: c.lastMessageSenderId,
+        unreadCount: mineByConv.get(c.id)?.unreadCount ?? 0,
       };
     });
   }
@@ -86,14 +83,24 @@ export class InMemoryConversationRepository implements ConversationRepository {
     );
   }
 
-  async touch(conversationId: string, at: Date): Promise<void> {
+  async recordMessage(conversationId: string, senderId: string, preview: string, at: Date): Promise<void> {
     const c = this.store.conversations.find((x) => x.id === conversationId);
-    if (c) c.lastMessageAt = at;
+    if (c) {
+      c.lastMessageAt = at;
+      c.lastMessageText = preview;
+      c.lastMessageSenderId = senderId;
+    }
+    for (const p of this.store.participants) {
+      if (p.conversationId === conversationId && p.userId !== senderId) p.unreadCount += 1;
+    }
   }
 
   async markRead(conversationId: string, userId: string, at: Date): Promise<void> {
     const p = this.store.participants.find((x) => x.conversationId === conversationId && x.userId === userId);
-    if (p) p.lastReadAt = at;
+    if (p) {
+      p.lastReadAt = at;
+      p.unreadCount = 0;
+    }
   }
 }
 

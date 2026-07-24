@@ -48,39 +48,26 @@ export class PrismaConversationRepository implements ConversationRepository {
   }
 
   async listForUser(userId: string): Promise<ConversationSummary[]> {
+    // Denormalize alanlar sayesinde konuşma sayısından bağımsız SABİT 2 sorgu (N+1 yok).
     const parts = await prisma.conversationParticipant.findMany({
       where: { userId },
-      select: { conversationId: true, lastReadAt: true },
+      select: { conversationId: true, unreadCount: true },
     });
     if (parts.length === 0) return [];
-    const readMap = new Map(parts.map((p) => [p.conversationId, p.lastReadAt]));
+    const unreadMap = new Map(parts.map((p) => [p.conversationId, p.unreadCount]));
     const convs = await prisma.conversation.findMany({
       where: { id: { in: parts.map((p) => p.conversationId) } },
       include: { participants: { select: { userId: true } } },
       orderBy: { lastMessageAt: "desc" },
     });
-    return Promise.all(
-      convs.map(async (c): Promise<ConversationSummary> => {
-        const otherUserId = c.participants.find((p) => p.userId !== userId)?.userId ?? "";
-        const last = await prisma.message.findFirst({
-          where: { conversationId: c.id },
-          orderBy: { createdAt: "desc" },
-          select: { text: true, senderId: true, imageUrl: true },
-        });
-        const lastRead = readMap.get(c.id) ?? new Date(0);
-        const unreadCount = await prisma.message.count({
-          where: { conversationId: c.id, senderId: { not: userId }, createdAt: { gt: lastRead } },
-        });
-        return {
-          id: c.id,
-          otherUserId,
-          lastMessageAt: c.lastMessageAt,
-          lastMessageText: last ? (last.text || (last.imageUrl ? "📷 Fotoğraf" : "")) : null,
-          lastMessageSenderId: last?.senderId ?? null,
-          unreadCount,
-        };
-      })
-    );
+    return convs.map((c) => ({
+      id: c.id,
+      otherUserId: c.participants.find((p) => p.userId !== userId)?.userId ?? "",
+      lastMessageAt: c.lastMessageAt,
+      lastMessageText: c.lastMessageText,
+      lastMessageSenderId: c.lastMessageSenderId,
+      unreadCount: unreadMap.get(c.id) ?? 0,
+    }));
   }
 
   async isParticipant(conversationId: string, userId: string): Promise<boolean> {
@@ -107,14 +94,21 @@ export class PrismaConversationRepository implements ConversationRepository {
     return row?.lastReadAt ?? null;
   }
 
-  async touch(conversationId: string, at: Date): Promise<void> {
-    await prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: at } });
+  async recordMessage(conversationId: string, senderId: string, preview: string, at: Date): Promise<void> {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: at, lastMessageText: preview, lastMessageSenderId: senderId },
+    });
+    await prisma.conversationParticipant.updateMany({
+      where: { conversationId, userId: { not: senderId } },
+      data: { unreadCount: { increment: 1 } },
+    });
   }
 
   async markRead(conversationId: string, userId: string, at: Date): Promise<void> {
     await prisma.conversationParticipant.updateMany({
       where: { conversationId, userId },
-      data: { lastReadAt: at },
+      data: { lastReadAt: at, unreadCount: 0 },
     });
   }
 }

@@ -167,8 +167,9 @@ export class MessagingService {
     }
     const now = this.now();
     const message = await this.deps.messages.create({ conversationId, senderId, text, imageUrl, now });
-    await this.deps.conversations.touch(conversationId, now);
-    await this.deps.conversations.markRead(conversationId, senderId, now); // gönderen kendi mesajını okumuş sayılır
+    const preview = text || (imageUrl ? "📷 Fotoğraf" : "");
+    await this.deps.conversations.recordMessage(conversationId, senderId, preview, now);
+    await this.deps.conversations.markRead(conversationId, senderId, now); // gönderen okumuş sayılır (unread 0)
     return message;
   }
 
